@@ -1,2 +1,64 @@
-.gitattributes
-agent.json
+# ==========================================
+# Python & Virtual Environments
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.python-version
+
+# Віртуальні оточення
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# ==========================================
+# Hugging Face & AI Models
+# ==========================================
+# Конфіденційні ключі та токени API
+.env
+.env.local
+*.secret
+
+# Локально завантажені вагові коефіцієнти моделей, датасети та кеш
+/models/
+/checkpoints/
+/datasets/
+.cache/
+huggingface/
+.huggingface/
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.onnx
+
+# ==========================================
+# Logs & Temporary Files
+# ==========================================
+*.log
+logs/
+*.sqlite3
+.tmp/
+/tmp/
+
+# ==========================================
+# IDE & Code Editors
+# ==========================================
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (PyCharm, CLion тощо)
+.idea/
+
+# macOS / Windows системні файли
+.DS_Store
+Thumbs.db
