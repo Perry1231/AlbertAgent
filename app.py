@@ -54,11 +54,11 @@ image_generation_tool = load_tool("agents-course/text-to-image", trust_remote_co
 with open("prompts.yaml", 'r') as stream:
     prompt_templates = yaml.safe_load(stream)
 
-    tools = [sum_tool, get_current_time_in_timezone, image_generation_tool, final_answer]  # Add your tools here=======
+tools = [sum_tool, get_current_time_in_timezone, image_generation_tool, final_answer, get_current_time_in_timezone]  # Add your tools here=======
 
 agent = CodeAgent(
     model=model,
-    tools=[final_answer], ## add your tools here (don't remove final answer)
+    tools=tools, ## add your tools here (don't remove final answer)
     max_steps=6,
     verbosity_level=1,
     grammar=None,
