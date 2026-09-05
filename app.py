@@ -38,7 +38,7 @@ tools = [search_tool, get_current_time]
 agent = CodeAgent(
     model=model,
     tools=tools,
-    max_steps=6,
+    max_steps=12,
     verbosity_level=1
 )
 
