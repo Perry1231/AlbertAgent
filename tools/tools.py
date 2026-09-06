@@ -31,13 +31,3 @@ def get_current_time(timezone: str) -> str:
     except Exception as e:
         return f"Error with timezone '{timezone}': {str(e)}"
 
-
-@tool
-def sum_tool(a: float, b: float) -> str:
-    """
-    Returns the sum of two numbers.
-    Args:
-        a: First number.
-        b: Second number.
-    """
-    return f"The sum of {a} and {b} is: {a + b}"
