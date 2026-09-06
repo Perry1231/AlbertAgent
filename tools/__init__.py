@@ -1,7 +1,10 @@
 # tools/__init__.py   Init all tools
+from tools.code_execution import execute_python_code
 from tools.tools import calculate_discount, sum_tool ,get_current_time
 from tools.math_tools import sum_tool, divide_tool, multiply_tool, subtract_tool
-from tools.web_tool import visit_webpage    
+from tools.web_tool import visit_webpage
+from tools.code_execution import execute_python_code   
+
 
 
 # Form a list of all tools to be exported
@@ -13,4 +16,6 @@ ALL_TOOLS = [
     subtract_tool,
     get_current_time,
     visit_webpage,
+    execute_python_code,
+    
 ]
