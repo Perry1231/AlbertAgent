@@ -1,4 +1,6 @@
 # tools/my_tools.py
+import datetime
+import pytz
 from smolagents import tool
 
 @tool
