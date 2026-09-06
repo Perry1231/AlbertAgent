@@ -5,3 +5,11 @@ huggingface_hub
 python-dotenv
 requests
 pytz
+smolagents
+gradio
+ddgs
+huggingface_hub
+python-dotenv
+requests
+pytz
+beautifulsoup4
