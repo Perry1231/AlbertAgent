@@ -4,7 +4,7 @@ from tools.tools import calculate_discount, sum_tool ,get_current_time
 from tools.math_tools import sum_tool, divide_tool, multiply_tool, subtract_tool
 from tools.web_tool import visit_webpage
 from tools.code_execution import execute_python_code
-from tools.api_tools import get_crypto_price, fetch_json_api   
+from tools.api_tools import get_crypto_price, fetch_json_api, get_weather_forecast   
 
 
 
@@ -20,5 +20,6 @@ ALL_TOOLS = [
     execute_python_code,
     get_crypto_price,
     fetch_json_api,
+    get_weather_forecast,
 
 ]

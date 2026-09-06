@@ -59,3 +59,62 @@ def fetch_json_api(endpoint_url: str) -> str:
 
     except requests.RequestException as e:
         return f"API Connector Error ({type(e).__name__}): {str(e)}"
+
+
+
+    import os
+import requests
+from dotenv import load_dotenv
+from smolagents import tool
+
+# Load environment variables from .env file when running locally
+load_dotenv()
+
+
+@tool
+def get_weather_forecast(city: str) -> str:
+    """
+    Fetches the current weather for a given city using the OpenWeather API with secure API key auth.
+
+    Args:
+        city: Name of the city (e.g., 'Lviv', 'Kyiv', 'London', 'New York').
+    """
+    # Fetch key from environment variables (works both in .env and HF Space Secrets)
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+
+    if not api_key:
+        return (
+            "Configuration Error: 'OPENWEATHER_API_KEY' is missing. "
+            "Please set it in your local .env file or Hugging Face Space Secrets."
+        )
+
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": api_key,
+        "units": "metric"
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 401:
+            return "Authentication Error: Invalid or expired API key provided."
+        
+        response.raise_for_status()
+        data = response.json()
+
+        weather_desc = data["weather"][0]["description"]
+        temp = data["main"]["temp"]
+        feels_like = data["main"]["feels_like"]
+        humidity = data["main"]["humidity"]
+
+        return (
+            f"Weather in {city.capitalize()}:\n"
+            f"- Condition: {weather_desc.capitalize()}\n"
+            f"- Temperature: {temp}°C (Feels like {feels_like}°C)\n"
+            f"- Humidity: {humidity}%"
+        )
+
+    except requests.RequestException as e:
+        return f"API Request Error ({type(e).__name__}): {str(e)}"
