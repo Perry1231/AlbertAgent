@@ -1,44 +1,30 @@
 import os
-import datetime
-import pytz
 from dotenv import load_dotenv
-from smolagents import CodeAgent, DuckDuckGoSearchTool, InferenceClientModel, tool, GradioUI
+from smolagents import CodeAgent, DuckDuckGoSearchTool, InferenceClientModel, GradioUI
 from tools import ALL_TOOLS
-import gradio as gr
-import spaces
-import torch
-import datetime
-import pytz
 
-zero = torch.Tensor([0]).cuda()
-print(zero.device) # <-- 'cpu' 🤔
-
-@spaces.GPU
-def greet(n):
-    print(zero.device) # <-- 'cuda:0' 🤗
-    return f"Hello {zero + n} Tensor"
-
-demo = gr.Interface(fn=greet, inputs=gr.Number(), outputs=gr.Text())
-demo.launch()
-
-# 1. Launch tocken from .env file
+# 1. Load environment variables from .env file
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
 
-
-# 3. Initialize the model
+# 2. Initialize the model through the Inference API (computations are performed on the HF side)
 model = InferenceClientModel(
     model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
     token=hf_token
 )
 
-# 4. Connect the tools to the agent
+# 3. Gather all tools together
 search_tool = DuckDuckGoSearchTool()
 tools = [search_tool] + ALL_TOOLS
 
-# 5. Creating agent
-agent = CodeAgent(model=model, tools=tools)
+# 4. Create the agent
+agent = CodeAgent(
+    model=model,
+    tools=tools,
+    max_steps=6,
+    verbosity_level=1
+)
 
-# 6. Launch the Gradio UI
+# 5. Launch the single Gradio UI
 if __name__ == "__main__":
     GradioUI(agent).launch()
