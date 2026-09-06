@@ -50,3 +50,5 @@ def visit_webpage(url: str) -> str:
 
     except requests.RequestException as e:
         return f"Failed to fetch content from '{url}': {str(e)}"
+
+    
