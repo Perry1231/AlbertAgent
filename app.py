@@ -28,8 +28,5 @@ agent = CodeAgent(
 # 5. Запуск GradioUI без некоректних аргументів
 if __name__ == "__main__":
     ui = GradioUI(agent)
-    ui.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=False
-    )
+    # Запускаємо без жорсткої прив'язки до 0.0.0.0 для локального тестування
+    ui.launch(share=False)
