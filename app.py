@@ -1,37 +1,47 @@
 import os
 from dotenv import load_dotenv
-from smolagents import CodeAgent, DuckDuckGoSearchTool, E2BExecutor, InferenceClientModel, GradioUI
+from smolagents import (
+    AgentLogger,
+    CodeAgent,
+    DuckDuckGoSearchTool,
+    E2BExecutor,
+    InferenceClientModel,
+    GradioUI
+)
 from tools import ALL_TOOLS
 
-# 1. load environment variables from .env file
+# 1. Завантажуємо змінні оточення з .env
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
 
-# 2. Initialize the model
+# 2. Ініціалізуємо модель
 model = InferenceClientModel(
     model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
     token=hf_token
 )
 
-# 3. Initialize the search tool and all other tools
+# 3. Збираємо інструменти та логер
 search_tool = DuckDuckGoSearchTool()
 tools = [search_tool] + ALL_TOOLS
+logger = AgentLogger()
 
-# 4. Create the agent
+# 4. Список додаткових бібліотек для середовища E2B
+additional_imports = [
+    "pandas", "numpy", "pillow", "pymupdf", "requests", 
+    "bs4", "json", "csv", "zipfile", "os", "re", "math"
+]
+
+# 5. Створюємо агента (передаємо створений logger)
 agent = CodeAgent(
     model=model,
     tools=tools,
     max_steps=6,
     verbosity_level=1,
     add_base_tools=True,
-    executor=E2BExecutor()  # authorized_imports повністю видаляємо
+    executor=E2BExecutor(additional_imports=additional_imports, logger=logger)
 )
 
-# 5. Launch GradioUI
+# 6. Запуск GradioUI
 if __name__ == "__main__":
-    # Launch test query (if needed to verify in console)
-    # response = agent.run("take a JSON file with a list of numbers, calculate the sum and average, and save the results to a new text file.")
-    
-    # Launch Gradio UI
     ui = GradioUI(agent)
     ui.launch(share=False)
