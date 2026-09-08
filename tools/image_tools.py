@@ -1,7 +1,11 @@
+import os
+from typing import Optional
+from PIL import Image
+import pytesseract
 from smolagents import tool
 
 @tool
-def process_image_tool(image_path: str, action: str, crop_box: list[int] = None) -> str:
+def process_image_tool(image_path: str, action: str, crop_box: Optional[list[int]] = None) -> str:
     """Processes an image: performs OCR (reads text) or crops it.
 
     Args:
