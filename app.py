@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from smolagents import CodeAgent, DuckDuckGoSearchTool, InferenceClientModel, GradioUI
+from smolagents import CodeAgent, DuckDuckGoSearchTool, E2BExecutor, InferenceClientModel, GradioUI
 from tools import ALL_TOOLS
 
 # 1. Завантажуємо токен з .env
@@ -24,11 +24,18 @@ agent = CodeAgent(
     max_steps=6,
     verbosity_level=1,
     add_base_tools=True,
-    authorized_imports=["math", "numpy", "pandas", "datetime"]
+    executor=E2BExecutor(), # Виконує код у віддаленій MicroVM
+    authorized_imports=[     # Для локального інтерпретатора (якщо приберете E2BExecutor)
+        "pandas", "numpy", "PIL", "fitz", "requests", 
+        "bs4", "json", "csv", "zipfile", "os", "re", "math"
+    ]
 )
 
-# 5. Запуск GradioUI без некоректних аргументів
+# 5. Запуск GradioUI
 if __name__ == "__main__":
+    # Запуск тестового запиту (якщо потрібно перевірити в консолі)
+    # response = agent.run("take a JSON file with a list of numbers, calculate the sum and average, and save the results to a new text file.")
+    
+    # Запуск Gradio UI
     ui = GradioUI(agent)
-    # Запускаємо без жорсткої прив'язки до 0.0.0.0 для локального тестування
     ui.launch(share=False)

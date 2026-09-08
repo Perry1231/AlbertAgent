@@ -50,5 +50,26 @@ def visit_webpage(url: str) -> str:
 
     except requests.RequestException as e:
         return f"Failed to fetch content from '{url}': {str(e)}"
+    
+
+
+@tool
+def smart_web_scraper(url: str, prompt: str) -> str:
+    """Витягує структуровані дані з веб-сторінки за допомогою природної мови та LLM.
+
+    Args:
+        url: Повне посилання на веб-сторінку (наприклад, 'https://example.com/products').
+        prompt: Опис того, які саме дані потрібно знайти та витягнути з цієї сторінки.
+    """
+    try:
+        scraper = SmartScraperGraph(
+            prompt=prompt,
+            source=url,
+            config=graph_config
+        )
+        result = scraper.run()
+        return str(result)
+    except Exception as e:
+        return f"Помилка при скрейпінгу: {str(e)}"
 
     
