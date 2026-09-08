@@ -1,24 +1,25 @@
 import os
 import json
 from dotenv import load_dotenv
-from datasets import load_dataset
 from huggingface_hub import login
+from datasets import load_dataset
 from tqdm import tqdm
 
-# 1. Завантажуємо токен з .env
 load_dotenv()
 hf_token = os.getenv("HF_TOKEN")
 
-if hf_token:
-    login(token=hf_token)
+# Перевірка зчитування токена
+if not hf_token:
+    raise ValueError("❌ HF_TOKEN не знайдено у файлі .env! Перевірте вміст .env")
 
-# 2. Імпортуємо агента (після завантаження env)
+print(f"🔑 Зчитано HF_TOKEN: {hf_token[:5]}...{hf_token[-4:]}")
+login(token=hf_token)
+
+# Імпортуємо агента
 from app import agent
 
 def main():
     print("🚀 Завантаження датасету GAIA...")
-    
-    # ПЕРЕДАЄМО token=hf_token СЮДИ:
     dataset = load_dataset("gaia-benchmark/GAIA", "2023_all", split="validation", token=hf_token)
 
     output_file = "submission.jsonl"

@@ -27,8 +27,7 @@ logger = AgentLogger()
 
 # 4. Список додаткових бібліотек для середовища E2B
 additional_imports = [
-    "pandas", "numpy", "pillow", "pymupdf", "requests", 
-    "bs4", "json", "csv", "zipfile", "os", "re", "math"
+    "pandas", "numpy", "pillow", "pymupdf", "requests", "bs4"
 ]
 
 # 5. Створюємо агента (передаємо створений logger)
