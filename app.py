@@ -22,7 +22,9 @@ agent = CodeAgent(
     model=model,
     tools=tools,
     max_steps=6,
-    verbosity_level=1
+    verbosity_level=1,
+    add_base_tools=True,
+    authorized_imports=["math", "numpy", "pandas", "datetime"]
 )
 
 # 5. Запуск GradioUI без некоректних аргументів
