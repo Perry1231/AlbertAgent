@@ -24,10 +24,7 @@ agent = CodeAgent(
     max_steps=6,
     verbosity_level=1,
     add_base_tools=True,
-    authorized_imports=[     # Для локального інтерпретатора (якщо приберете E2BExecutor)
-        "pandas", "numpy", "PIL", "fitz", "requests", 
-        "bs4", "json", "csv", "zipfile", "os", "re", "math"
-    ]
+    executor=E2BExecutor()  # authorized_imports повністю видаляємо
 )
 
 # 5. Launch GradioUI
