@@ -55,11 +55,11 @@ def visit_webpage(url: str) -> str:
 
 @tool
 def smart_web_scraper(url: str, prompt: str) -> str:
-    """Витягує структуровані дані з веб-сторінки за допомогою природної мови та LLM.
+    """Extracts structured data from a webpage using natural language and an LLM.
 
     Args:
-        url: Повне посилання на веб-сторінку (наприклад, 'https://example.com/products').
-        prompt: Опис того, які саме дані потрібно знайти та витягнути з цієї сторінки.
+        url: The full URL of the webpage (e.g., 'https://example.com/products').
+        prompt: A description of the specific data to extract from the page.
     """
     try:
         scraper = SmartScraperGraph(
@@ -70,6 +70,6 @@ def smart_web_scraper(url: str, prompt: str) -> str:
         result = scraper.run()
         return str(result)
     except Exception as e:
-        return f"Помилка при скрейпінгу: {str(e)}"
+        return f"Error occurred while scraping: {str(e)}"
 
     
