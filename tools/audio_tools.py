@@ -16,7 +16,7 @@ def transcribe_audio_tool(audio_path: str) -> str:
         return f"Error: Audio file '{audio_path}' not found."
 
     try:
-        import whisper
+        import whisper  # Імпорт ТІЛЬКИ у блоці try всередині функції!
         model = whisper.load_model("base")
         result = model.transcribe(audio_path)
         return result.get("text", "")
