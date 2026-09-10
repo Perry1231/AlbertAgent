@@ -1,33 +1,26 @@
-# tools/my_tools.py
-import datetime
-import pytz
+from datetime import datetime
 from smolagents import tool
 
 @tool
-def calculate_discount(price: float, discount_percent: float) -> str:
+def get_current_time() -> str:
+    """Returns the current UTC time as a formatted string.
+
+    Returns:
+        str: Current UTC date and time in YYYY-MM-DD HH:MM:SS format.
     """
-    Обчислює підсумкову ціну товару зі знижкою.
-
-    Args:
-        price: Початкова ціна товару.
-        discount_percent: Відсоток знижки (наприклад, 20 для 20%).
-    """
-    final_price = price - (price * (discount_percent / 100))
-    return f"Ціна зі знижкою {discount_percent}% становить: {final_price:.2f}"
-
-
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
 @tool
-def get_current_time(timezone: str) -> str:
-    """
-    Getts the current time in the specified timezone.
-    Args:
-        timezone: The timezone for which to get the current time (e.g., 'Europe/Kyiv', 'America/New_York').
-    """
-    try:
-        tz = pytz.timezone(timezone)
-        local_time = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-        return f"Current time in {timezone}: {local_time}"
-    except Exception as e:
-        return f"Error with timezone '{timezone}': {str(e)}"
+def calculate_discount(price: float, discount_percent: float) -> str:
+    """Calculates the final price of an item after applying a percentage discount.
 
+    Args:
+        price: The original price of the item.
+        discount_percent: The percentage discount to apply (e.g., 20 for 20%).
+
+    Returns:
+        str: Formatted sentence stating the final price after discount.
+    """
+    final_price = price - (price * (discount_percent / 100))
+    return f"Final price with a {discount_percent}% discount is: {final_price:.2f}"

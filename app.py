@@ -30,11 +30,11 @@ additional_imports = [
     "pandas", "numpy", "pillow", "pymupdf", "requests", "bs4"
 ]
 
-# 5. Створюємо агента (передаємо створений logger)
+# 5. Створюємо агента (збільшено max_steps для складних завдань GAIA)
 agent = CodeAgent(
     model=model,
     tools=tools,
-    max_steps=6,
+    max_steps=12,
     verbosity_level=1,
     add_base_tools=True,
     executor=E2BExecutor(additional_imports=additional_imports, logger=logger)
