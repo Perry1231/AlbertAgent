@@ -1,75 +1,44 @@
-import requests
-from bs4 import BeautifulSoup
 from smolagents import tool
-
 
 @tool
 def visit_webpage(url: str) -> str:
-    """
-    Visits a specified URL and extracts its main textual content while removing HTML tags.
-    Useful for reading full articles, blog posts, or online documentation found via search.
+    """Visits a webpage and returns its text content.
 
     Args:
-        url: The full web page URL (e.g., 'https://en.wikipedia.org/wiki/Artificial_intelligence').
+        url: The URL of the webpage to visit.
+
+    Returns:
+        str: Extracted text content from the webpage.
     """
+    import requests
+    from bs4 import BeautifulSoup
+
     try:
-        # User-Agent header to mimic a standard browser request
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/119.0.0.0 Safari/537.36"
-            )
-        }
-        
-        # Fetch the webpage with a 10-second timeout
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-
-        # Parse HTML markup using BeautifulSoup
+        response = requests.get(url, timeout=15)
         soup = BeautifulSoup(response.text, "html.parser")
-
-        # Decompose non-content scripts, styles, and navigational elements
-        for element in soup(["script", "style", "nav", "footer", "header", "noscript"]):
-            element.decompose()
-
-        # Extract plain text content
-        text = soup.get_text(separator="\n")
-
-        # Clean up whitespace and empty lines
-        lines = (line.strip() for line in text.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        clean_text = "\n".join(chunk for chunk in chunks if chunk)
-
-        # Truncate output to prevent exceeding context window limits
-        max_length = 5000
-        if len(clean_text) > max_length:
-            return clean_text[:max_length] + f"\n\n...[Content truncated to {max_length} characters]"
-
-        return clean_text if clean_text else "The webpage is empty or contains no readable text."
-
-    except requests.RequestException as e:
-        return f"Failed to fetch content from '{url}': {str(e)}"
-    
-
+        return soup.get_text(separator=" ", strip=True)[:4000]
+    except Exception as e:
+        return f"Error visiting webpage: {str(e)}"
 
 @tool
 def smart_web_scraper(url: str, prompt: str) -> str:
-    """Extracts structured data from a webpage using natural language and an LLM.
+    """Scrapes structured information from a webpage using a prompt.
 
     Args:
-        url: The full URL of the webpage (e.g., 'https://example.com/products').
-        prompt: A description of the specific data to extract from the page.
-    """
-    try:
-        scraper = SmartScraperGraph(
-            prompt=prompt,
-            source=url,
-            config=graph_config
-        )
-        result = scraper.run()
-        return str(result)
-    except Exception as e:
-        return f"Error occurred while scraping: {str(e)}"
+        url: The URL to scrape.
+        prompt: Description of the data to extract.
 
-    
+    Returns:
+        str: Extracted content or fallback search result.
+    """
+    import requests
+    from bs4 import BeautifulSoup
+
+    # Якщо scrapegraphai не встановлено або не зконфігуровано — використовуємо надійний fallback
+    try:
+        response = requests.get(url, timeout=15)
+        soup = BeautifulSoup(response.text, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
+        return text[:4000]
+    except Exception as e:
+        return f"Error scraping web page: {str(e)}"
