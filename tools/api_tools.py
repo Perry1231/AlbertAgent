@@ -1,42 +1,29 @@
-import requests
 from smolagents import tool
 
-
 @tool
-def get_crypto_price(coin_id: str = "bitcoin", currency: str = "usd") -> str:
-    """
-    Fetches the current market price and 24h change for a specified cryptocurrency using the CoinGecko API.
+def get_crypto_price(symbol: str) -> str:
+    """Fetches the current price of a given cryptocurrency in USD.
 
     Args:
-        coin_id: The API identifier of the cryptocurrency (e.g., 'bitcoin', 'ethereum', 'solana', 'cardano').
-        currency: Target fiat currency code (e.g., 'usd', 'eur', 'uah').
+        symbol: The cryptocurrency symbol (e.g., 'BTC', 'ETH').
+
+    Returns:
+        str: Formatted string with the current price or error message.
     """
-    url = f"https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": coin_id.lower(),
-        "vs_currencies": currency.lower(),
-        "include_24hr_change": "true"
-    }
+    import requests  # Обов'язковий імпорт всередині функції
 
     try:
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol.lower()}&vs_currencies=usd"
+        response = requests.get(url, timeout=10)
         data = response.json()
+        if symbol.lower() in data:
+            price = data[symbol.lower()]["usd"]
+            return f"The current price of {symbol.upper()} is ${price} USD."
+        return f"Could not find price data for {symbol}."
+    except Exception as e:
+        return f"Error fetching crypto price: {str(e)}"
 
-        if coin_id.lower() in data:
-            price = data[coin_id.lower()][currency.lower()]
-            change_24h = data[coin_id.lower()].get(f"{currency.lower()}_24h_change", 0.0)
-            return (
-                f"Current price for {coin_id.capitalize()}: {price:.2f} {currency.upper()}\n"
-                f"24h Change: {change_24h:+.2f}%"
-            )
-        else:
-            return f"Coin '{coin_id}' not found. Please verify the coin identifier."
-
-    except requests.RequestException as e:
-        return f"API Connector Error: Failed to fetch cryptocurrency data. {str(e)}"
-
-
+    
 @tool
 def fetch_json_api(endpoint_url: str) -> str:
     """

@@ -20,7 +20,7 @@ from app import agent
 
 def main():
     print("🚀 Завантаження датасету GAIA...")
-    dataset = load_dataset("gaia-benchmark/GAIA", "2023_all", split="test", token=hf_token)
+    dataset = load_dataset("gaia-benchmark/GAIA", "2023_all", split="validation", token=hf_token)
     output_file = "submission.jsonl"
     print(f"📊 Початок прогону {len(dataset)} завдань GAIA...")
 
