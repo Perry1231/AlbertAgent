@@ -1,22 +1,34 @@
 import os
 import json
 from dotenv import load_dotenv
-from huggingface_hub import login
 from datasets import load_dataset
 from tqdm import tqdm
 
+from smolagents import OpenAIServerModel, CodeAgent
+from tools import ALL_TOOLS
+
 load_dotenv()
+
+# Перевірка ключів доступу
+openrouter_key = os.getenv("OPENROUTER_API_KEY")
 hf_token = os.getenv("HF_TOKEN")
 
-# Перевірка зчитування токена
-if not hf_token:
-    raise ValueError("❌ HF_TOKEN не знайдено у файлі .env! Перевірте вміст .env")
+if not openrouter_key:
+    raise ValueError("❌ OPENROUTER_API_KEY не знайдено у файлі .env!")
 
-print(f"🔑 Зчитано HF_TOKEN: {hf_token[:5]}...{hf_token[-4:]}")
-login(token=hf_token)
+# Ініціалізація безкоштовної моделі через OpenRouter
+model = OpenAIServerModel(
+    model_id="qwen/qwen-2.5-coder-32b-instruct:free",
+    api_base="https://openrouter.ai/api/v1",
+    api_key=openrouter_key,
+)
 
-# Імпортуємо агента
-from app import agent
+# Створення CodeAgent з підключеними інструментами
+agent = CodeAgent(
+    tools=ALL_TOOLS,
+    model=model,
+    additional_authorized_imports=["requests", "bs4", "pandas", "numpy", "math"],
+)
 
 def main():
     print("🚀 Завантаження датасету GAIA...")
@@ -45,7 +57,7 @@ def main():
         }
 
         with open(output_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(result_entry) + "\n")
+            f.write(json.dumps(result_entry, ensure_ascii=False) + "\n")
 
     print(f"\n✅ Тестування завершено! Результати збережено у {output_file}")
 
