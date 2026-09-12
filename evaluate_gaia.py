@@ -9,21 +9,23 @@ from tools import ALL_TOOLS
 
 load_dotenv()
 
-# Перевірка ключів доступу
-openrouter_key = os.getenv("OPENROUTER_API_KEY")
+# Отримуємо ключ Groq та HF токен
+groq_key = os.getenv("GROQ_API_KEY")
 hf_token = os.getenv("HF_TOKEN")
 
-if not openrouter_key:
-    raise ValueError("❌ OPENROUTER_API_KEY не знайдено у файлі .env!")
+if not groq_key:
+    raise ValueError("❌ GROQ_API_KEY не знайдено у файлі .env!")
 
-# Ініціалізація безкоштовної моделі через OpenRouter
+# Підключаємо Llama 3.3 70B через безкоштовний та швидкий Groq API
+groq_key = os.getenv("GROQ_API_KEY")
+
 model = OpenAIServerModel(
-    model_id="qwen/qwen-2.5-coder-32b-instruct:free",
-    api_base="https://openrouter.ai/api/v1",
-    api_key=openrouter_key,
+    model_id="llama-3.3-70b-versatile",
+    api_base="https://api.groq.com/openai/v1",  # Переконуємось, що endpoint Groq, а не OpenRouter
+    api_key=groq_key,
 )
 
-# Створення CodeAgent з підключеними інструментами
+# Створення CodeAgent з інструментами
 agent = CodeAgent(
     tools=ALL_TOOLS,
     model=model,
@@ -47,10 +49,13 @@ def main():
 
         try:
             response = agent.run(prompt)
-            prediction = str(response).strip()
+            if response is None:
+                prediction = "Error: Model returned empty response (None)"
+            else:
+                prediction = str(response).strip()
         except Exception as e:
             prediction = f"Error: {str(e)}"
-
+            
         result_entry = {
             "task_id": task_id,
             "model_answer": prediction
