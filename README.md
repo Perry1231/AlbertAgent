@@ -242,4 +242,87 @@ GROQ_API_KEY=your_key
 
 Make sure the configured model is available through Groq.
 
-C
+Current model:
+
+```text
+openai/gpt-oss-120b
+```
+
+### Unicode / encoding errors on Windows
+
+The evaluator configures UTF-8 output:
+
+```python
+os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
+```
+
+and configures `stdout` and `stderr` to use UTF-8.
+
+### Agent does not call tools correctly
+
+Make sure the project uses:
+
+```python
+from smolagents import ToolCallingAgent
+```
+
+and:
+
+```python
+agent = ToolCallingAgent(
+    tools=ALL_TOOLS,
+    model=model,
+    verbosity_level=0,
+)
+```
+
+## Security
+
+Do not publish API keys or tokens.
+
+Never commit:
+
+```text
+.env
+```
+
+or any file containing:
+
+```text
+GROQ_API_KEY
+HF_TOKEN
+```
+
+If a key is accidentally pushed to GitHub, revoke it immediately and generate a new one.
+
+## Development
+
+Recommended development workflow:
+
+```text
+1. Modify the agent or tools
+        |
+        v
+2. Run one GAIA task
+        |
+        v
+3. Check the model answer
+        |
+        v
+4. Fix errors
+        |
+        v
+5. Run several tasks
+        |
+        v
+6. Run the full benchmark
+```
+
+This makes debugging easier than immediately running all GAIA tasks.
+
+## License
+
+This project is intended for educational, research, and experimental purposes.
+
+Add an appropriate license before publishing the repository.
