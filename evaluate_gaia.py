@@ -41,6 +41,16 @@ from datasets import load_dataset
 from tqdm import tqdm
 
 from smolagents import OpenAIServerModel, CodeAgent
+class GroqCodeAgentModel(OpenAIServerModel):
+    def _prepare_completion_kwargs(self, *args, **kwargs):
+        completion_kwargs = super()._prepare_completion_kwargs(*args, **kwargs)
+
+        # CodeAgent executes tools through generated Python code.
+        # Do not expose tools through the OpenAI/Groq native tool-calling API.
+        completion_kwargs.pop("tools", None)
+        completion_kwargs.pop("tool_choice", None)
+
+        return completion_kwargs
 from tools import ALL_TOOLS
 
 
@@ -75,10 +85,11 @@ if not groq_key:
 # MODEL
 # ============================================================
 
-model = OpenAIServerModel(
+model = GroqCodeAgentModel(
     model_id="openai/gpt-oss-120b",
     api_base="https://api.groq.com/openai/v1",
     api_key=groq_key,
+    flatten_messages_as_text=True,
 )
 
 
