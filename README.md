@@ -1,137 +1,245 @@
-#  AlbertAgent
+# AlbertAgent
 
-**AlbertAgent** is an autonomous AI agent built on top of the [`smolagents`](https://github.com/huggingface/smolagents) framework and powered by the **Qwen2.5-Coder-32B-Instruct** LLM backbone. It is designed to tackle complex, multimodal reasoning tasks and evaluate performance on the **GAIA (General AI Assistants)** benchmark.
+AI agent for solving tasks from the [GAIA Benchmark](https://huggingface.co/datasets/gaia-benchmark/GAIA).
 
-The agent features secure code execution within an **E2B** sandbox environment, system-level Bash integration, web scraping, data analysis, and multimodal processing capabilities (audio, image, and video).
+The project uses an LLM through the Groq API together with `smolagents` and a set of external tools to solve multi-step research and reasoning tasks.
 
----
+## Features
 
-##  Key Features
+* AI agent based on `smolagents`
+* `openai/gpt-oss-120b` model via Groq
+* Tool calling for external operations
+* GAIA Benchmark evaluation
+* Automatic generation of `submission.jsonl`
+* API keys loaded from `.env`
+* Ability to test a single task before running the full benchmark
 
-- **LLM Backbone:** `Qwen/Qwen2.5-Coder-32B-Instruct` served via Hugging Face Inference API.
-- **Code Execution:** Secure Python execution and data analysis using the **E2BExecutor** sandbox.
-- **Extensive Toolset (Custom Tools):**
-  - **Web & Search:** Web scraping (`BeautifulSoup4`) and webpage fetching.
-  - **Bash & System:** System command execution, `pip` package installation, and file management.
-  - **Data Analysis:** JSON/CSV parsing and analytics via `pandas` and `numpy`.
-  - **Media Processing:** Audio transcription (`openai-whisper`), image processing (`Pillow`), and video frame extraction (`OpenCV`).
-- **Benchmarking:** Built-in evaluation pipeline for the **GAIA** dataset (`gaia-benchmark/GAIA`).
-
----
-
-##  Project Structure
+## Project Structure
 
 ```text
 AlbertAgent/
-├── tools/                  # Modular custom tools directory
-│   ├── __init__.py         # Exports ALL_TOOLS list
-│   ├── api_tools.py        # External API tools (Crypto, Weather)
-│   ├── audio_tools.py      # Audio processing & transcription (Whisper)
-│   ├── bash_tools.py       # System shell and bash execution
-│   ├── code_execution.py   # Dynamic Python code execution
-│   ├── file_tools.py       # File reading/writing utilities
-│   ├── image_tools.py      # Image processing tools
-│   ├── math_tools.py       # Basic arithmetic operations
-│   ├── video_tools.py      # Video frame extraction
-│   ├── web_tool.py         # Web scraping and navigation
-│   └── tools.py            # Helper tools (time, discount calculation)
-├── app.py                  # CodeAgent setup and Gradio UI
-├── evaluate_gaia.py        # GAIA evaluation runner script
-├── check_score.py          # Benchmark accuracy calculator
-├── .env                    # Environment variables (HF_TOKEN, E2B_API_KEY)
-└── requirements.txt        # Project dependencies
-
+│
+├── evaluate_gaia.py      # Main GAIA evaluation script
+├── tools.py              # Agent tools
+├── .env                  # API keys (not committed)
+├── .gitignore
+├── submission.jsonl      # Generated evaluation results
+└── README.md
 ```
 
----
+## Requirements
 
-##  Quick Start
+* Python 3.10+
+* Groq API key
+* Hugging Face token
+* Internet connection
 
-### 1. Clone the Repository
+## Installation
+
+Clone the repository:
 
 ```bash
-git clone [https://github.com/your-username/AlbertAgent.git](https://github.com/your-username/AlbertAgent.git)
+git clone https://github.com/YOUR_USERNAME/AlbertAgent.git
 cd AlbertAgent
-
 ```
 
-### 2. Set Up a Virtual Environment
+Create a virtual environment.
 
-**Windows (PowerShell):**
+### Windows
 
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope Process
 python -m venv venv
-.\venv\Scripts\Activate.ps1
-
+venv\Scripts\activate
 ```
 
-**Linux / macOS:**
+### Linux / macOS
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-
 ```
 
-### 3. Install Dependencies
+Install dependencies:
 
 ```bash
-python -m pip install --upgrade pip
-pip install smolagents pandas numpy pillow pymupdf requests beautifulsoup4 pytz openai-whisper opencv-python python-dotenv datasets e2b-code-interpreter
-
+pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+If `requirements.txt` does not exist yet:
 
-Create a `.env` file in the root directory:
+```bash
+pip install smolagents openai datasets python-dotenv tqdm
+```
+
+## Environment Variables
+
+Create a `.env` file in the project root:
 
 ```env
-HF_TOKEN=your_huggingface_token_here
-E2B_API_KEY=your_e2b_api_key_here  # Optional: for enhanced code sandbox execution
-
+GROQ_API_KEY=your_groq_api_key
+HF_TOKEN=your_huggingface_token
 ```
 
----
+Never commit `.env` to GitHub.
 
-## 💻 Usage
+Add it to `.gitignore`:
 
-### Interactive Web UI (Gradio)
-
-To launch the interactive web interface in your browser:
-
-```bash
-python app.py
-
+```gitignore
+.env
+venv/
+__pycache__/
+*.pyc
+submission.jsonl
 ```
 
-### Running GAIA Benchmark Evaluation
+## Model
 
-To execute the evaluation suite against the GAIA benchmark:
+The project currently uses:
 
-```bash
+```text
+openai/gpt-oss-120b
+```
+
+through the Groq OpenAI-compatible API:
+
+```text
+https://api.groq.com/openai/v1
+```
+
+The agent uses `ToolCallingAgent` from `smolagents` to allow the model to call available tools while solving tasks.
+
+## Running the Evaluator
+
+Run:
+
+```powershell
 python evaluate_gaia.py
-
 ```
 
-Once the run completes, evaluate your score:
+The program will:
 
-```bash
-python check_score.py
+1. Load the GAIA validation dataset.
+2. Select the configured tasks for evaluation.
+3. Send each task to the AI agent.
+4. Allow the model to use available tools.
+5. Receive the final answer.
+6. Save the result to `submission.jsonl`.
 
+Example output:
+
+```text
+STEP 1: Starting program...
+STEP 2: Loading GAIA dataset...
+STEP 3: Dataset loaded. Tasks: 165
+STEP 4: Starting evaluation...
+
+Processing task 1/165
+
+========== PROMPT SENT TO AGENT ==========
+
+...
+
+========== MODEL ANSWER ==========
+
+...
+
+Evaluation finished!
+Results saved to submission.jsonl
 ```
 
----
+## Testing With One Task
 
-##  Development Guidelines for Custom Tools
+During development, it is recommended to test only one task first.
 
-When adding new tools to the `tools/` directory, ensure compliance with `smolagents` AST validation requirements:
+In `evaluate_gaia.py`:
 
-* **Local Imports:** All external package imports (`requests`, `json`, `os`, `subprocess`, `whisper`, etc.) **must be placed inside the function body** decorated with `@tool`.
-* **Type Annotations & Docstrings:** Every function requires clear type hints and Google-style docstrings describing the arguments (`Args:`) and return values (`Returns:`).
+```python
+test_dataset = dataset.select(range(1))
+```
 
----
+This runs only the first task.
 
-##  License
+After the agent works correctly, the project can be configured to evaluate the full dataset:
 
-This project is licensed under the MIT License.
+```python
+test_dataset = dataset
+```
+
+## Output
+
+Results are saved to:
+
+```text
+submission.jsonl
+```
+
+Each line contains a task ID and the model's answer:
+
+```json
+{
+  "task_id": "example-task-id",
+  "model_answer": "Example answer"
+}
+```
+
+## Agent Architecture
+
+The basic workflow is:
+
+```text
+GAIA Dataset
+     |
+     v
+   Task
+     |
+     v
+ToolCallingAgent
+     |
+     v
+GPT-OSS-120B
+     |
+     +---------> Tool
+     |             |
+     |             v
+     |        Tool Result
+     |             |
+     <-------------+
+     |
+     v
+Final Answer
+     |
+     v
+submission.jsonl
+```
+
+## Tools
+
+Available tools are defined in:
+
+```text
+tools.py
+```
+
+and collected through:
+
+```python
+ALL_TOOLS
+```
+
+The agent can use these tools to perform operations required by individual GAIA tasks.
+
+## Troubleshooting
+
+### GROQ_API_KEY not found
+
+Make sure `.env` exists in the project root:
+
+```env
+GROQ_API_KEY=your_key
+```
+
+### Model not found / 404
+
+Make sure the configured model is available through Groq.
+
+C
