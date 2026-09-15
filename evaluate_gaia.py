@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 import io
@@ -11,7 +13,6 @@ os.environ["PYTHONIOENCODING"] = "utf-8"
 os.environ["NO_COLOR"] = "1"
 os.environ["TERM"] = "dumb"
 
-# Безпечне переналаштування stdout/stderr
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
@@ -33,6 +34,7 @@ except AttributeError:
 
 import json
 import logging
+import traceback
 
 from dotenv import load_dotenv
 from datasets import load_dataset
@@ -106,7 +108,12 @@ def main():
 
     print("STEP 1: Starting program...", flush=True)
 
+    # --------------------------------------------------------
+    # LOAD DATASET
+    # --------------------------------------------------------
+
     try:
+
         print("STEP 2: Loading GAIA dataset...", flush=True)
 
         dataset = load_dataset(
@@ -122,14 +129,31 @@ def main():
         )
 
     except Exception as e:
-        print("\n!!! ERROR WHILE LOADING DATASET !!!", flush=True)
-        print("Error type:", type(e).__name__, flush=True)
-        print("Error:", repr(e), flush=True)
 
-        import traceback
+        print(
+            "\n!!! ERROR LOADING DATASET !!!",
+            flush=True
+        )
+
+        print(
+            "TYPE:",
+            type(e).__name__,
+            flush=True
+        )
+
+        print(
+            "ERROR:",
+            repr(e),
+            flush=True
+        )
+
         traceback.print_exc()
 
         raise
+
+    # --------------------------------------------------------
+    # OUTPUT FILE
+    # --------------------------------------------------------
 
     output_file = "submission.jsonl"
 
@@ -138,7 +162,6 @@ def main():
         flush=True
     )
 
-    # Очистити старий submission
     with open(
         output_file,
         "w",
@@ -147,8 +170,16 @@ def main():
     ):
         pass
 
+    # --------------------------------------------------------
+    # EVALUATE TASKS
+    # --------------------------------------------------------
+
     for index, item in enumerate(
-        tqdm(dataset, ascii=True, desc="Evaluating")
+    tqdm(
+        dataset.select(range(1)),
+        ascii=True,
+        desc="Evaluating"
+    )
     ):
 
         print(
@@ -165,6 +196,10 @@ def main():
         if file_name:
             prompt += f"\n\nAttached file: {file_name}"
 
+        # ----------------------------------------------------
+        # RUN AGENT
+        # ----------------------------------------------------
+
         try:
 
             response = agent.run(prompt)
@@ -177,32 +212,63 @@ def main():
         except Exception as e:
 
             print(
-                "\n!!! ERROR IN AGENT !!!",
+                "\n========== AGENT ERROR ==========",
                 flush=True
             )
 
             print(
-                "Task ID:",
-                task_id,
+                "TASK ID:",
+                repr(task_id),
                 flush=True
             )
 
             print(
-                "Error type:",
+                "ERROR TYPE:",
                 type(e).__name__,
                 flush=True
             )
 
             print(
-                "Error:",
+                "ERROR:",
                 repr(e),
                 flush=True
             )
 
-            import traceback
+            if e.__cause__ is not None:
+
+                print(
+                    "CAUSE TYPE:",
+                    type(e.__cause__).__name__,
+                    flush=True
+                )
+
+                print(
+                    "CAUSE:",
+                    repr(e.__cause__),
+                    flush=True
+                )
+
+            if e.__context__ is not None:
+
+                print(
+                    "CONTEXT TYPE:",
+                    type(e.__context__).__name__,
+                    flush=True
+                )
+
+                print(
+                    "CONTEXT:",
+                    repr(e.__context__),
+                    flush=True
+                )
+
             traceback.print_exc()
 
             prediction = f"Error: {repr(e)}"
+
+        # ----------------------------------------------------
+        # SAVE RESULT
+        # ----------------------------------------------------
 
         result_entry = {
             "task_id": task_id,
@@ -223,6 +289,10 @@ def main():
                 ) + "\n"
             )
 
+    # --------------------------------------------------------
+    # FINISHED
+    # --------------------------------------------------------
+
     print(
         "\nEvaluation finished!",
         flush=True
@@ -232,3 +302,11 @@ def main():
         f"Results saved to {output_file}",
         flush=True
     )
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
+if __name__ == "__main__":
+    main()
