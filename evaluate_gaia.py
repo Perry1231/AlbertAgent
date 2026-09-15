@@ -3,6 +3,9 @@
 import os
 import sys
 import io
+import json
+import logging
+import traceback
 
 # ============================================================
 # FORCE UTF-8
@@ -32,25 +35,12 @@ except AttributeError:
 # IMPORTS
 # ============================================================
 
-import json
-import logging
-import traceback
-
 from dotenv import load_dotenv
 from datasets import load_dataset
 from tqdm import tqdm
 
-from smolagents import OpenAIServerModel, CodeAgent
-class GroqCodeAgentModel(OpenAIServerModel):
-    def _prepare_completion_kwargs(self, *args, **kwargs):
-        completion_kwargs = super()._prepare_completion_kwargs(*args, **kwargs)
+from smolagents import OpenAIServerModel, ToolCallingAgent
 
-        # CodeAgent executes tools through generated Python code.
-        # Do not expose tools through the OpenAI/Groq native tool-calling API.
-        completion_kwargs.pop("tools", None)
-        completion_kwargs.pop("tool_choice", None)
-
-        return completion_kwargs
 from tools import ALL_TOOLS
 
 
@@ -78,17 +68,24 @@ groq_key = os.getenv("GROQ_API_KEY")
 hf_token = os.getenv("HF_TOKEN")
 
 if not groq_key:
-    raise ValueError("GROQ_API_KEY not found in .env file!")
+    raise ValueError(
+        "GROQ_API_KEY not found in .env file!"
+    )
 
 
 # ============================================================
 # MODEL
 # ============================================================
 
-model = GroqCodeAgentModel(
+model = OpenAIServerModel(
     model_id="openai/gpt-oss-120b",
     api_base="https://api.groq.com/openai/v1",
     api_key=groq_key,
+
+    # ВАЖЛИВО:
+    # Для ToolCallingAgent дозволяємо native tool calling
+    tool_choice="auto",
+
     flatten_messages_as_text=True,
 )
 
@@ -97,33 +94,10 @@ model = GroqCodeAgentModel(
 # AGENT
 # ============================================================
 
-agent = CodeAgent(
+agent = ToolCallingAgent(
     tools=ALL_TOOLS,
     model=model,
     verbosity_level=0,
-    additional_authorized_imports=[
-    "requests",
-    "bs4",
-    "pandas",
-    "numpy",
-    "math",
-    "json",
-    "re",
-    "datetime",
-    "time",
-    "xml",
-    "xml.etree",
-    "xml.etree.ElementTree",
-    "textwrap",
-    "html",
-    "statistics",
-    "itertools",
-    "collections",
-    "random",
-    "queue",
-    "unicodedata",
-    "stat"
-    ]
 )
 
 
@@ -133,7 +107,10 @@ agent = CodeAgent(
 
 def main():
 
-    print("STEP 1: Starting program...", flush=True)
+    print(
+        "STEP 1: Starting program...",
+        flush=True
+    )
 
     # --------------------------------------------------------
     # LOAD DATASET
@@ -141,7 +118,10 @@ def main():
 
     try:
 
-        print("STEP 2: Loading GAIA dataset...", flush=True)
+        print(
+            "STEP 2: Loading GAIA dataset...",
+            flush=True
+        )
 
         dataset = load_dataset(
             "gaia-benchmark/GAIA",
@@ -198,15 +178,22 @@ def main():
         pass
 
     # --------------------------------------------------------
-    # EVALUATE TASKS
+    # TEMPORARY TEST
+    # ONLY FIRST TASK
+    # --------------------------------------------------------
+
+    test_dataset = dataset.select(range(1))
+
+    # --------------------------------------------------------
+    # EVALUATE
     # --------------------------------------------------------
 
     for index, item in enumerate(
-    tqdm(
-        dataset.select(range(1)),
-        ascii=True,
-        desc="Evaluating"
-    )
+        tqdm(
+            test_dataset,
+            ascii=True,
+            desc="Evaluating"
+        )
     ):
 
         print(
@@ -221,7 +208,9 @@ def main():
         prompt = question
 
         if file_name:
-            prompt += f"\n\nAttached file: {file_name}"
+            prompt += (
+                f"\n\nAttached file: {file_name}"
+            )
 
         # ----------------------------------------------------
         # RUN AGENT
@@ -229,12 +218,45 @@ def main():
 
         try:
 
+            print(
+                "\n========== PROMPT SENT TO AGENT ==========",
+                flush=True
+            )
+
+            print(
+                prompt,
+                flush=True
+            )
+
+            print(
+                "==========================================\n",
+                flush=True
+            )
+
             response = agent.run(prompt)
 
             if response is None:
+
                 prediction = "Error: Empty response"
+
             else:
+
                 prediction = str(response).strip()
+
+            print(
+                "\n========== MODEL ANSWER ==========",
+                flush=True
+            )
+
+            print(
+                prediction,
+                flush=True
+            )
+
+            print(
+                "==================================\n",
+                flush=True
+            )
 
         except Exception as e:
 
