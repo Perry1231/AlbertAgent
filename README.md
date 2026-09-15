@@ -323,6 +323,4 @@ This makes debugging easier than immediately running all GAIA tasks.
 
 ## License
 
-This project is intended for educational, research, and experimental purposes.
-
-Add an appropriate license before publishing the repository.
+this project is under MIT License
