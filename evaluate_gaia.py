@@ -91,12 +91,28 @@ agent = CodeAgent(
     model=model,
     verbosity_level=0,
     additional_authorized_imports=[
-        "requests",
-        "bs4",
-        "pandas",
-        "numpy",
-        "math"
-    ],
+    "requests",
+    "bs4",
+    "pandas",
+    "numpy",
+    "math",
+    "json",
+    "re",
+    "datetime",
+    "time",
+    "xml",
+    "xml.etree",
+    "xml.etree.ElementTree",
+    "textwrap",
+    "html",
+    "statistics",
+    "itertools",
+    "collections",
+    "random",
+    "queue",
+    "unicodedata",
+    "stat"
+    ]
 )
 
 
