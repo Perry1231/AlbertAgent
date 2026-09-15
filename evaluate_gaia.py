@@ -76,7 +76,7 @@ if not groq_key:
 # ============================================================
 
 model = OpenAIServerModel(
-    model_id="llama-3.3-70b-versatile",
+    model_id="openai/gpt-oss-120b",
     api_base="https://api.groq.com/openai/v1",
     api_key=groq_key,
 )
