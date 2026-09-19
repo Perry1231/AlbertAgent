@@ -105,7 +105,7 @@ agent = CodeAgent(
     executor=executor,
 )
 
-
+print("MAX STEPS =", agent.max_steps, flush=True)
 # ============================================================
 # 8. Запуск Gradio
 # ============================================================
