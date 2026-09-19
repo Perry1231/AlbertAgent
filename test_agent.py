@@ -36,7 +36,9 @@ agent = ToolCallingAgent(
     model=model,
     verbosity_level=1,
 )
-
+print("AVAILABLE AGENT TOOLS:")
+print(list(agent.tools.keys()))
+print()
 print("8. Agent created", flush=True)
 
 print("9. Sending request to agent...", flush=True)
