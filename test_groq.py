@@ -13,31 +13,38 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "test_tool",
-            "description": "A test tool",
+            "name": "web_search",
+            "description": "Search the web for information.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "text": {
-                        "type": "string"
+                    "query": {
+                        "type": "string",
+                        "description": "Search query"
                     }
                 },
-                "required": ["text"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     }
 ]
 
 response = client.chat.completions.create(
     model="openai/gpt-oss-120b",
+
     messages=[
         {
             "role": "user",
-            "content": "Use the test_tool with text='hello'."
+            "content": (
+                "Search the web for the paper about AI regulation "
+                "originally submitted to arXiv in June 2022."
+            ),
         }
     ],
+
     tools=tools,
+
     tool_choice="auto",
 )
 
-print(response.choices[0].message)
+print(response)
