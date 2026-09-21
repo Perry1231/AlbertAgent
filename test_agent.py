@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 print("1. START", flush=True)
 
-from smolagents import ToolCallingAgent, OpenAIServerModel, DuckDuckGoSearchTool
+from smolagents import CodeAgent, OpenAIServerModel, DuckDuckGoSearchTool
 print("2. smolagents imported", flush=True)
 
 from tools import ALL_TOOLS
@@ -34,18 +34,19 @@ print("7. Creating tools...", flush=True)
 
 search_tool = DuckDuckGoSearchTool()
 
-tools = [search_tool] + ALL_TOOLS
+tools = [search_tool]                                                                                   
 
 print("NUMBER OF TOOLS:", len(tools), flush=True)
 print("TOOLS:", [tool.name for tool in tools], flush=True)
 
 print("8. Creating ToolCallingAgent...", flush=True)
 
-agent = ToolCallingAgent(
+agent = CodeAgent(
     model=model,
     tools=tools,
-    max_steps=3,
+    max_steps=5,
     verbosity_level=2,
+    add_base_tools=False,
 )
 
 print("9. Agent created", flush=True)
@@ -59,9 +60,11 @@ print()
 print("10. Sending request to agent...", flush=True)
 
 response = agent.run(
-    'Search the web for "AI regulation arXiv June 2022" and give me 3 short results.'
+    """
+    Search the web for "AI regulation arXiv June 2022".
+    Find one relevant result and return its title and URL.
+    """
 )
-
 print("11. Agent finished", flush=True)
 
 print("==============================")
