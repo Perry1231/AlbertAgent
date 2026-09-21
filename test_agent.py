@@ -3,11 +3,11 @@ from dotenv import load_dotenv
 
 print("1. START", flush=True)
 
-from smolagents import ToolCallingAgent, OpenAIServerModel
+from smolagents import CodeAgent, OpenAIServerModel, DuckDuckGoSearchTool
 print("2. smolagents imported", flush=True)
 
 from tools import ALL_TOOLS
-print(f"3. Tools loaded: {len(ALL_TOOLS)}", flush=True)
+print(f"3. ALL_TOOLS loaded: {len(ALL_TOOLS)}", flush=True)
 
 load_dotenv()
 
@@ -24,35 +24,46 @@ model = OpenAIServerModel(
     model_id="openai/gpt-oss-120b",
     api_base="https://api.groq.com/openai/v1",
     api_key=api_key,
-    tool_choice="auto",
+    temperature=0.2,
+    max_tokens=512,
 )
 
 print("6. Model created", flush=True)
 
-print("7. Creating ToolCallingAgent...", flush=True)
+print("7. Creating tools...", flush=True)
 
-agent = ToolCallingAgent(
-    tools=ALL_TOOLS,
+search_tool = DuckDuckGoSearchTool()
+
+tools = [search_tool] + ALL_TOOLS
+
+print("NUMBER OF TOOLS:", len(tools), flush=True)
+print("TOOLS:", [tool.name for tool in tools], flush=True)
+
+print("8. Creating CodeAgent...", flush=True)
+
+agent = CodeAgent(
     model=model,
-    verbosity_level=1,
+    tools=tools,
+    max_steps=3,
+    verbosity_level=2,
+    add_base_tools=False,
 )
+
+print("9. Agent created", flush=True)
+
+print("MAX STEPS:", agent.max_steps, flush=True)
+
 print("AVAILABLE AGENT TOOLS:")
 print(list(agent.tools.keys()))
 print()
-print("8. Agent created", flush=True)
 
-print("9. Sending request to agent...", flush=True)
+print("10. Sending request to agent...", flush=True)
 
 response = agent.run(
-    """
-    Use the available web search tool to search for:
-    "AI regulation arXiv June 2022"
-
-    Return the search results briefly.
-    """
+    "Calculate 25 * 4 using the available calculation tools. Answer briefly."
 )
 
-print("10. Agent finished", flush=True)
+print("11. Agent finished", flush=True)
 
 print("==============================")
 print("ANSWER")
