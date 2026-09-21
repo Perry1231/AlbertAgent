@@ -1,26 +1,83 @@
 from smolagents import tool
 
+
 @tool
 def execute_python_code(code: str) -> str:
-    """Executes arbitrary Python code and returns the captured output or error.
+    """
+    Executes Python code and returns stdout or the value
+    of the last expression.
 
     Args:
-        code: A string containing valid Python code to execute.
+        code: A string containing valid Python code.
 
     Returns:
-        str: Captured stdout output or formatted exception details.
+        Captured output, last expression value, or error.
     """
+
+    import ast
     import sys
     from io import StringIO
 
     old_stdout = sys.stdout
-    redirected_output = sys.stdout = StringIO()
+    redirected_output = StringIO()
+    sys.stdout = redirected_output
 
     try:
-        exec(code)
-        output = redirected_output.getvalue()
-        return output if output else "Code executed successfully with no output."
+        # Parse the code so we can detect the final expression.
+        tree = ast.parse(code, mode="exec")
+
+        last_value = None
+
+        # If the last statement is an expression,
+        # evaluate it separately so its value is returned.
+        if tree.body and isinstance(tree.body[-1], ast.Expr):
+            last_expression = tree.body.pop()
+
+            code_without_last = compile(
+                tree,
+                "<agent_code>",
+                "exec",
+            )
+
+            namespace = {}
+
+            exec(
+                code_without_last,
+                namespace,
+                namespace,
+            )
+
+            last_value = eval(
+                compile(
+                    ast.Expression(last_expression.value),
+                    "<agent_expression>",
+                    "eval",
+                ),
+                namespace,
+                namespace,
+            )
+
+        else:
+            namespace = {}
+
+            exec(
+                compile(tree, "<agent_code>", "exec"),
+                namespace,
+                namespace,
+            )
+
+        output = redirected_output.getvalue().strip()
+
+        if output:
+            return output
+
+        if last_value is not None:
+            return str(last_value)
+
+        return "Code executed successfully with no output."
+
     except Exception as e:
-        return f"Error executing code: {str(e)}"
+        return f"Error executing code: {type(e).__name__}: {e}"
+
     finally:
         sys.stdout = old_stdout
