@@ -25,15 +25,22 @@ client = OpenAI(
     api_key=api_key,
 )
 
+
 MODEL = "openai/gpt-oss-120b"
 
-MAX_STEPS = 8
-MAX_TOOL_RESULT_CHARS = 8000
-MAX_RETRIES = 3
+# IMPORTANT:
+# Keep this low to reduce token usage.
+MAX_STEPS = 5
+
+# Maximum amount of tool output sent back to the model.
+MAX_TOOL_RESULT_CHARS = 5000
+
+# Maximum retries for temporary API errors.
+MAX_RETRIES = 2
 
 
 # ==========================================
-# CONVERT smolagents TOOLS -> OPENAI TOOLS
+# TOOL SCHEMAS
 # ==========================================
 
 def build_tool_schemas(tools):
@@ -59,7 +66,7 @@ def build_tool_schemas(tools):
 
 
 # ==========================================
-# TOOL DISPATCHER
+# TOOL MAP
 # ==========================================
 
 TOOL_MAP = {
@@ -67,6 +74,10 @@ TOOL_MAP = {
     for tool in ALL_TOOLS
 }
 
+
+# ==========================================
+# TOOL EXECUTION
+# ==========================================
 
 def execute_tool(name, arguments):
 
@@ -87,14 +98,15 @@ def execute_tool(name, arguments):
 
         result = str(result)
 
-        # Prevent huge tool outputs from destroying context
         if len(result) > MAX_TOOL_RESULT_CHARS:
+
             result = (
                 result[:MAX_TOOL_RESULT_CHARS]
                 + "\n\n[TOOL OUTPUT TRUNCATED]"
             )
 
-        print(f"RESULT: {result}")
+        print("RESULT:")
+        print(result)
 
         return result
 
@@ -111,7 +123,7 @@ def execute_tool(name, arguments):
 
 
 # ==========================================
-# GROQ REQUEST WITH RETRY
+# GROQ REQUEST
 # ==========================================
 
 def create_completion(messages, tool_schemas):
@@ -125,24 +137,39 @@ def create_completion(messages, tool_schemas):
                 messages=messages,
                 tools=tool_schemas,
                 tool_choice="auto",
-                max_tokens=800,
+                max_tokens=600,
             )
 
         except Exception as e:
 
-            error_text = str(e)
+            error_text = str(e).lower()
 
-            # Retry rate limits
-            if "429" in error_text or "rate_limit" in error_text.lower():
+            # ----------------------------------
+            # RATE LIMIT
+            # ----------------------------------
+
+            if "429" in error_text or "rate_limit" in error_text:
+
+                # Daily TPD limit.
+                # Retrying will NOT solve it.
+                if "tokens per day" in error_text or "tpd" in error_text:
+
+                    print()
+                    print("=" * 60)
+                    print("GROQ DAILY TOKEN LIMIT REACHED")
+                    print("=" * 60)
+                    print(e)
+
+                    raise
 
                 if attempt == MAX_RETRIES:
                     raise
 
-                wait_time = attempt * 10
+                wait_time = attempt * 5
 
                 print()
                 print(
-                    f"Rate limit detected. "
+                    f"Temporary rate limit. "
                     f"Retrying in {wait_time}s..."
                 )
 
@@ -159,27 +186,43 @@ def create_completion(messages, tool_schemas):
 def run_agent(user_message):
 
     messages = [
+
         {
             "role": "system",
             "content": (
-                "You are Albert, a helpful AI agent solving GAIA "
-                "benchmark tasks.\n\n"
+                "You are Albert, an efficient AI agent solving "
+                "GAIA benchmark tasks.\n\n"
 
-                "Use tools when necessary.\n"
-                "Do not call tools unnecessarily.\n\n"
+                "Rules:\n"
 
-                "For calculations, prefer execute_python_code.\n"
-                "For web information, use search and visit_webpage.\n\n"
+                "1. Use tools only when necessary.\n"
 
-                "After you have enough information to answer the "
-                "question, STOP using tools and provide the final answer.\n\n"
+                "2. For arithmetic and calculations, use "
+                "execute_python_code when useful.\n"
 
-                "Do not continue searching if the answer can already "
-                "be calculated.\n\n"
+                "3. For current or factual web information, "
+                "use search or visit_webpage.\n"
 
-                "Always provide a final answer."
+                "4. Do not repeat the same search unless "
+                "the previous result was insufficient.\n"
+
+                "5. Do not search for information that is "
+                "already available in the conversation.\n"
+
+                "6. Once you have enough information, "
+                "STOP using tools.\n\n"
+
+                "7. Give a concise final answer.\n\n"
+
+                "8. Never continue tool calls just because "
+                "you have remaining steps.\n\n"
+
+                "9. If a tool returns enough information to "
+                "solve the task, calculate the answer and "
+                "finish immediately."
             ),
         },
+
         {
             "role": "user",
             "content": user_message,
@@ -187,6 +230,10 @@ def run_agent(user_message):
     ]
 
     tool_schemas = build_tool_schemas(ALL_TOOLS)
+
+    # ======================================
+    # AGENT LOOP
+    # ======================================
 
     for step in range(1, MAX_STEPS + 1):
 
@@ -216,9 +263,9 @@ def run_agent(user_message):
 
         message = response.choices[0].message
 
-        # ------------------------------------------
-        # NO TOOL CALL -> FINAL ANSWER
-        # ------------------------------------------
+        # ==================================
+        # FINAL ANSWER
+        # ==================================
 
         if not message.tool_calls:
 
@@ -233,36 +280,48 @@ def run_agent(user_message):
 
             return final_answer
 
-        # ------------------------------------------
-        # ADD ASSISTANT TOOL CALL MESSAGE
-        # ------------------------------------------
+        # ==================================
+        # ASSISTANT TOOL CALL
+        # ==================================
 
         messages.append({
+
             "role": "assistant",
+
             "content": message.content or "",
+
             "tool_calls": [
+
                 {
                     "id": call.id,
+
                     "type": "function",
+
                     "function": {
                         "name": call.function.name,
                         "arguments": call.function.arguments,
                     },
                 }
+
                 for call in message.tool_calls
             ],
         })
 
-        # ------------------------------------------
-        # EXECUTE TOOL CALLS
-        # ------------------------------------------
+        # ==================================
+        # EXECUTE TOOLS
+        # ==================================
 
         for call in message.tool_calls:
 
             raw_arguments = call.function.arguments
 
             print()
-            print(f"RAW TOOL ARGUMENTS: {raw_arguments}")
+            print("RAW TOOL ARGUMENTS:")
+            print(raw_arguments)
+
+            # ------------------------------
+            # JSON VALIDATION
+            # ------------------------------
 
             try:
 
@@ -271,9 +330,10 @@ def run_agent(user_message):
             except json.JSONDecodeError as e:
 
                 result = (
-                    "The tool arguments were invalid JSON. "
-                    "Do not repeat the same tool call. "
-                    "Return valid JSON arguments only. "
+                    "INVALID TOOL ARGUMENTS.\n"
+                    "The arguments must be valid JSON.\n"
+                    "Do not call the tool again with "
+                    "the same invalid arguments.\n"
                     f"JSON error: {e}"
                 )
 
@@ -285,10 +345,17 @@ def run_agent(user_message):
                 )
 
             messages.append({
+
                 "role": "tool",
+
                 "tool_call_id": call.id,
+
                 "content": str(result),
             })
+
+    # ======================================
+    # MAX STEPS
+    # ======================================
 
     return (
         "Agent stopped because MAX_STEPS was reached. "
@@ -316,10 +383,9 @@ if __name__ == "__main__":
     for tool in ALL_TOOLS:
         print(f" - {tool.name}")
 
-    print()
+    print() 
     print("=" * 60)
 
     user_input = input("You: ")
 
     run_agent(user_input)
-
