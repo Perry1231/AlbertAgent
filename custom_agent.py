@@ -26,7 +26,7 @@ client = OpenAI(
 
 MODEL = "openai/gpt-oss-120b"
 
-MAX_STEPS = 6
+MAX_STEPS = 12
 
 
 # ==========================================
@@ -105,11 +105,13 @@ def run_agent(user_message):
         {
             "role": "system",
             "content": (
-                "You are Albert, a helpful AI agent. "
-                "Use the available tools when they are useful. "
+                "You are Albert, a helpful AI agent solving GAIA benchmark tasks. "
+                "Use tools when necessary. "
                 "Do not call tools unnecessarily. "
-                "After receiving tool results, continue reasoning "
-                "and provide a concise final answer."
+                "After you have enough information to answer the question, "
+                "STOP using tools and provide the final answer. "
+                "Do not continue searching if the answer can already be calculated. "
+                "Always provide a final answer instead of continuing indefinitely."
             ),
         },
         {
