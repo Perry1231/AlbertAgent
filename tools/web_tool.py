@@ -1,44 +1,167 @@
 from smolagents import tool
+import requests
+from bs4 import BeautifulSoup
+
 
 @tool
-def visit_webpage(url: str) -> str:
-    """Visits a webpage and returns its text content.
+def search(
+    query: str,
+    top_n: int = 5,
+) -> str:
+    """
+    Searches the web and returns relevant search results.
 
     Args:
-        url: The URL of the webpage to visit.
+        query: Search query.
+        top_n: Maximum number of search results.
 
     Returns:
-        str: Extracted text content from the webpage.
+        A text summary of search results.
     """
-    import requests
-    from bs4 import BeautifulSoup
 
     try:
-        response = requests.get(url, timeout=15)
-        soup = BeautifulSoup(response.text, "html.parser")
-        return soup.get_text(separator=" ", strip=True)[:4000]
-    except Exception as e:
-        return f"Error visiting webpage: {str(e)}"
+        from ddgs import DDGS
 
+        top_n = max(1, min(top_n, 10))
+
+        results = DDGS().text(
+            query,
+            max_results=top_n,
+        )
+
+        if not results:
+            return "No search results found."
+
+        output = []
+
+        for i, result in enumerate(results, 1):
+            title = result.get("title", "")
+            url = result.get("href", "")
+            body = result.get("body", "")
+
+            output.append(
+                f"{i}. {title}\n"
+                f"URL: {url}\n"
+                f"Snippet: {body}"
+            )
+
+        return "\n\n".join(output)
+
+    except Exception as e:
+        return f"Search error: {type(e).__name__}: {e}"
+    
 @tool
-def smart_web_scraper(url: str, prompt: str) -> str:
-    """Scrapes structured information from a webpage using a prompt.
+def visit_webpage(url: str) -> str:
+    """
+    Visits a webpage and returns its text content.
 
     Args:
-        url: The URL to scrape.
+        url: URL of the webpage to visit.
+
+    Returns:
+        Extracted text from the webpage.
+    """
+
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "(KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            )
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=15,
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser",
+        )
+
+        for element in soup(
+            ["script", "style", "noscript"]
+        ):
+            element.decompose()
+
+        text = soup.get_text(
+            separator="\n",
+            strip=True,
+        )
+
+        if not text:
+            return "No text content found."
+
+        # Prevent enormous tool results.
+        return text[:12000]
+
+    except Exception as e:
+        return f"Webpage error: {type(e).__name__}: {e}"
+
+
+@tool
+def smart_web_scraper(
+    url: str,
+    prompt: str,
+) -> str:
+    """
+    Scrapes structured information from a webpage.
+
+    Args:
+        url: URL to scrape.
         prompt: Description of the data to extract.
 
     Returns:
-        str: Extracted content or fallback search result.
+        Webpage text that can be analyzed according to the prompt.
     """
-    import requests
-    from bs4 import BeautifulSoup
 
-    # Якщо scrapegraphai не встановлено або не зконфігуровано — використовуємо надійний fallback
     try:
-        response = requests.get(url, timeout=15)
-        soup = BeautifulSoup(response.text, "html.parser")
-        text = soup.get_text(separator=" ", strip=True)
-        return text[:4000]
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "(KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            )
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=15,
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser",
+        )
+
+        for element in soup(
+            ["script", "style", "noscript"]
+        ):
+            element.decompose()
+
+        text = soup.get_text(
+            separator="\n",
+            strip=True,
+        )
+
+        if not text:
+            return "No content found."
+
+        return (
+            f"SCRAPED WEBPAGE:\n\n"
+            f"{text[:12000]}\n\n"
+            f"EXTRACTION REQUEST:\n{prompt}"
+        )
+
     except Exception as e:
-        return f"Error scraping web page: {str(e)}"
+        return f"Scraper error: {type(e).__name__}: {e}"
