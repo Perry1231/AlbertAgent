@@ -35,7 +35,13 @@ dataset = load_dataset(
 )
 
 print(f"Tasks loaded: {len(dataset)}")
+print()
+print("DATASET COLUMNS:")
+print(dataset.column_names)
 
+print()
+print("FIRST TASK:")
+print(dataset[0])
 
 # ==========================================
 # RUN

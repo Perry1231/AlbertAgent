@@ -28,14 +28,8 @@ client = OpenAI(
 
 MODEL = "openai/gpt-oss-120b"
 
-# IMPORTANT:
-# Keep this low to reduce token usage.
-MAX_STEPS = 5
-
-# Maximum amount of tool output sent back to the model.
+MAX_STEPS = 8
 MAX_TOOL_RESULT_CHARS = 5000
-
-# Maximum retries for temporary API errors.
 MAX_RETRIES = 2
 
 
@@ -144,23 +138,31 @@ def create_completion(messages, tool_schemas):
 
             error_text = str(e).lower()
 
-            # ----------------------------------
-            # RATE LIMIT
-            # ----------------------------------
+            # ==================================
+            # GROQ DAILY TOKEN LIMIT
+            # ==================================
 
-            if "429" in error_text or "rate_limit" in error_text:
+            if (
+                "tokens per day" in error_text
+                or "tpd" in error_text
+            ):
 
-                # Daily TPD limit.
-                # Retrying will NOT solve it.
-                if "tokens per day" in error_text or "tpd" in error_text:
+                print()
+                print("=" * 60)
+                print("GROQ DAILY TOKEN LIMIT REACHED")
+                print("=" * 60)
+                print(e)
 
-                    print()
-                    print("=" * 60)
-                    print("GROQ DAILY TOKEN LIMIT REACHED")
-                    print("=" * 60)
-                    print(e)
+                raise
 
-                    raise
+            # ==================================
+            # TEMPORARY RATE LIMIT
+            # ==================================
+
+            if (
+                "429" in error_text
+                or "rate_limit" in error_text
+            ):
 
                 if attempt == MAX_RETRIES:
                     raise
@@ -175,8 +177,46 @@ def create_completion(messages, tool_schemas):
 
                 time.sleep(wait_time)
 
-            else:
-                raise
+                continue
+
+            # ==================================
+            # OUTPUT PARSE ERROR
+            # ==================================
+
+            if "output_parse_failed" in error_text:
+
+                print()
+                print("=" * 60)
+                print("GROQ OUTPUT PARSING ERROR")
+                print("=" * 60)
+                print(e)
+
+                if attempt == MAX_RETRIES:
+                    raise
+
+                # Add an instruction for the next attempt.
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Your previous response could not be parsed. "
+                        "Do not write reasoning or planning text. "
+                        "If a tool returns enough information to "
+                        "solve the task, calculate the answer and "
+                        "finish immediately.\n\n"
+
+                        "If a search result contains the required "
+                        "numerical value, do not search again. Use "
+                        "execute_python_code for the calculation if needed.\n\n"
+                    ),
+                })
+
+                continue
+
+            # ==================================
+            # OTHER API ERROR
+            # ==================================
+
+            raise
 
 
 # ==========================================
@@ -193,21 +233,21 @@ def run_agent(user_message):
                 "You are Albert, an efficient AI agent solving "
                 "GAIA benchmark tasks.\n\n"
 
-                "Rules:\n"
+                "Rules:\n\n"
 
-                "1. Use tools only when necessary.\n"
+                "1. Use tools only when necessary.\n\n"
 
                 "2. For arithmetic and calculations, use "
-                "execute_python_code when useful.\n"
+                "execute_python_code when useful.\n\n"
 
                 "3. For current or factual web information, "
-                "use search or visit_webpage.\n"
+                "use search or visit_webpage.\n\n"
 
                 "4. Do not repeat the same search unless "
-                "the previous result was insufficient.\n"
+                "the previous result was insufficient.\n\n"
 
                 "5. Do not search for information that is "
-                "already available in the conversation.\n"
+                "already available in the conversation.\n\n"
 
                 "6. Once you have enough information, "
                 "STOP using tools.\n\n"
@@ -219,7 +259,17 @@ def run_agent(user_message):
 
                 "9. If a tool returns enough information to "
                 "solve the task, calculate the answer and "
-                "finish immediately."
+                "finish immediately.\n\n"
+
+                "10. Do not write reasoning or planning text "
+                "before a tool call.\n\n"
+
+                "11. If you need a tool, call it directly.\n\n"
+
+                "12. After receiving a tool result, either "
+                "call another tool or provide the final answer.\n\n"
+
+                "13. Never output internal reasoning as plain text."
             ),
         },
 
@@ -319,10 +369,6 @@ def run_agent(user_message):
             print("RAW TOOL ARGUMENTS:")
             print(raw_arguments)
 
-            # ------------------------------
-            # JSON VALIDATION
-            # ------------------------------
-
             try:
 
                 arguments = json.loads(raw_arguments)
@@ -383,7 +429,7 @@ if __name__ == "__main__":
     for tool in ALL_TOOLS:
         print(f" - {tool.name}")
 
-    print() 
+    print()
     print("=" * 60)
 
     user_input = input("You: ")
