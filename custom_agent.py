@@ -29,7 +29,7 @@ client = OpenAI(
 MODEL = "openai/gpt-oss-120b"
 
 MAX_STEPS = 8
-MAX_TOOL_RESULT_CHARS = 10000
+MAX_TOOL_RESULT_CHARS = 2500
 MAX_RETRIES = 2
 
 
@@ -131,7 +131,7 @@ def create_completion(messages, tool_schemas):
                 messages=messages,
                 tools=tool_schemas,
                 tool_choice="auto",
-                max_tokens=600,
+                max_tokens=400,
             )
 
         except Exception as e:
