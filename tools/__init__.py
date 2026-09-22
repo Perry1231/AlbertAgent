@@ -27,7 +27,9 @@ from tools.web_tool import (
     search,
 )
 
-from tools.code_execution import execute_python_code
+from tools.code_execution import (
+    execute_python_code,
+)
 
 from tools.api_tools import (
     get_crypto_price,
@@ -44,17 +46,22 @@ ALL_TOOLS = [
     multiply_tool,
     subtract_tool,
     get_current_time,
+
     visit_webpage,
     search,
-    find_in_page,
+
     execute_python_code,
+
     get_crypto_price,
     fetch_json_api,
     get_weather_forecast,
+
     run_bash_command,
     read_json_file,
     save_text_to_file,
+
     smart_web_scraper,
+
     execute_bash_command,
     install_pip_package,
 ]

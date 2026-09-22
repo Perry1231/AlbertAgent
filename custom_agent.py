@@ -29,7 +29,7 @@ client = OpenAI(
 MODEL = "openai/gpt-oss-120b"
 
 MAX_STEPS = 8
-MAX_TOOL_RESULT_CHARS = 5000
+MAX_TOOL_RESULT_CHARS = 10000
 MAX_RETRIES = 2
 
 
@@ -235,41 +235,47 @@ def run_agent(user_message):
 
                 "Rules:\n\n"
 
-                "1. Use tools only when necessary.\n\n"
+"1. Use tools only when necessary.\n\n"
 
-                "2. For arithmetic and calculations, use "
-                "execute_python_code when useful.\n\n"
+"2. You may ONLY call tools that are present in the "
+"provided tool list. Never invent a tool name.\n\n"
 
-                "3. For current or factual web information, "
-                "use search or visit_webpage.\n\n"
+"3. Available tools include search, visit_webpage, "
+"execute_python_code, and other tools provided by the API. "
+"Do not call find, find_in_page, browser, calculator, "
+"or any other tool unless it is explicitly provided.\n\n"
 
-                "4. Do not repeat the same search unless "
-                "the previous result was insufficient.\n\n"
+"4. For arithmetic and calculations, use "
+"execute_python_code.\n\n"
 
-                "5. Do not search for information that is "
-                "already available in the conversation.\n\n"
+"5. For current or factual web information, use search "
+"or visit_webpage.\n\n"
 
-                "6. Once you have enough information, "
-                "STOP using tools.\n\n"
+"6. If search results already contain the required "
+"information, do not search again and do not try to "
+"find text inside the result. Use the information directly.\n\n"
 
-                "7. Give a concise final answer.\n\n"
+"7. Do not repeat the same search unless the previous "
+"result was insufficient.\n\n"
 
-                "8. Never continue tool calls just because "
-                "you have remaining steps.\n\n"
+"8. Once you have enough information, stop using tools "
+"and provide the final answer.\n\n"
 
-                "9. If a tool returns enough information to "
-                "solve the task, calculate the answer and "
-                "finish immediately.\n\n"
+"9. If a tool returns enough information to solve the "
+"task, calculate the answer and finish immediately.\n\n"
 
-                "10. Do not write reasoning or planning text "
-                "before a tool call.\n\n"
+"10. For numerical calculations, prefer "
+"execute_python_code rather than mental arithmetic.\n\n"
 
-                "11. If you need a tool, call it directly.\n\n"
+"11. Do not write reasoning or planning text before "
+"a tool call.\n\n"
 
-                "12. After receiving a tool result, either "
-                "call another tool or provide the final answer.\n\n"
+"12. If you need a tool, call it directly.\n\n"
 
-                "13. Never output internal reasoning as plain text."
+"13. After receiving a tool result, either call another "
+"available tool or provide the final answer.\n\n"
+
+"14. Never output internal reasoning as plain text."
             ),
         },
 
