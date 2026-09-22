@@ -276,6 +276,9 @@ def run_agent(user_message):
 "available tool or provide the final answer.\n\n"
 
 "14. Never output internal reasoning as plain text."
+
+"15. If a search returns empty results, try a different "
+"search query once. Do not repeatedly call the same empty search.\n\n"
             ),
         },
 

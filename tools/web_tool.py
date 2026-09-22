@@ -9,26 +9,22 @@ from bs4 import BeautifulSoup
 # ==========================================
 
 @tool
-def search(
-    query: str,
-    top_n: int = 5,
-) -> str:
+def search(query: str, top_n: int = 5) -> str:
     """
-    Searches the web and returns relevant search results.
+    Searches the web and returns useful search results.
 
     Args:
-        query: Search query.
-        top_n: Maximum number of search results.
+        query: The search query.
+        top_n: Maximum number of search results to return.
 
     Returns:
-        A text summary of search results.
+        Search results with titles, URLs, and snippets.
     """
 
     try:
-
         from ddgs import DDGS
 
-        top_n = max(1, min(top_n, 10))
+        top_n = max(1, min(top_n, 5))
 
         results = DDGS().text(
             query,
@@ -42,15 +38,21 @@ def search(
 
         for i, result in enumerate(results, 1):
 
-            title = result.get("title", "")
-            url = result.get("href", "")
-            body = result.get("body", "")
+            title = result.get("title") or ""
+            url = result.get("href") or ""
+            body = result.get("body") or ""
+
+            if not title and not url and not body:
+                continue
 
             output.append(
                 f"{i}. {title}\n"
                 f"URL: {url}\n"
                 f"Snippet: {body}"
             )
+
+        if not output:
+            return "Search returned empty results."
 
         return "\n\n".join(output)
 
@@ -60,12 +62,8 @@ def search(
             f"Search error: "
             f"{type(e).__name__}: {e}"
         )
-
-
-# ==========================================
-# VISIT WEBPAGE
-# ==========================================
-
+    
+    
 @tool
 def visit_webpage(url: str) -> str:
     """
