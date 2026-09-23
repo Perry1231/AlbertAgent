@@ -53,7 +53,7 @@ with open(
     encoding="utf-8",
 ) as output:
 
-    for index, task in enumerate(dataset.select(range(1, 2))):
+    for index, task in enumerate(dataset.select(range(1))):
         task_id = task["task_id"]
         question = task["Question"]
 

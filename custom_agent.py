@@ -249,8 +249,10 @@ def run_agent(user_message):
 "4. For arithmetic and calculations, use "
 "execute_python_code.\n\n"
 
-"5. For current or factual web information, use search "
-"or visit_webpage.\n\n"
+"5. For factual web information, use search first. "
+"Use visit_webpage only for URLs that are accessible. "
+"Do not assume Wikipedia is required just because the "
+"question mentions information commonly found there.\n\n"
 
 "6. If search results already contain the required "
 "information, do not search again and do not try to "
@@ -300,6 +302,9 @@ def run_agent(user_message):
 "20. When a search result provides a useful webpage URL, "
 "prefer visit_webpage to retrieve the page content. "
 "Do not use a JSON API unless it is clearly necessary.\n\n"
+
+"21. Use web search only when necessary and do not perform "
+"more than two searches for the same task.\n\n"
             ),
         },
 
