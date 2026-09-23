@@ -68,6 +68,7 @@ TOOL_MAP = {
     for tool in ALL_TOOLS
 }
 
+SEARCH_MAX_CALLS = 2
 
 # ==========================================
 # TOOL EXECUTION
@@ -258,11 +259,13 @@ def run_agent(user_message):
 "7. Do not repeat the same search unless the previous "
 "result was insufficient.\n\n"
 
-"8. Once you have enough information, stop using tools "
-"and provide the final answer.\n\n"
+"8. Once a tool result contains enough information to "
+"answer the question, STOP calling tools and immediately "
+"provide the final answer.\n\n"
 
-"9. If a tool returns enough information to solve the "
-"task, calculate the answer and finish immediately.\n\n"
+"9. If a search result contains the answer explicitly, "
+"return that answer directly. Do not search for the same "
+"information again.\n\n"
 
 "10. For numerical calculations, prefer "
 "execute_python_code rather than mental arithmetic.\n\n"
@@ -279,6 +282,24 @@ def run_agent(user_message):
 
 "15. If a search returns empty results, try a different "
 "search query once. Do not repeatedly call the same empty search.\n\n"
+
+"16. Never finish with an empty response. If you have "
+"enough information, always provide a concise textual answer.\n\n"
+
+"17. Use search at most twice for a task. After "
+"two searches, use the information already obtained "
+"and provide the final answer.\n\n"
+
+"18. If fetch_json_api returns a 403, Forbidden, or access "
+"error, do not retry the same API request. Use search or "
+"visit_webpage instead.\n\n"
+
+"19. Never repeat a tool call that failed with 403 Forbidden. "
+"Use another available source or method.\n\n"
+
+"20. When a search result provides a useful webpage URL, "
+"prefer visit_webpage to retrieve the page content. "
+"Do not use a JSON API unless it is clearly necessary.\n\n"
             ),
         },
 
@@ -328,7 +349,24 @@ def run_agent(user_message):
 
         if not message.tool_calls:
 
-            final_answer = message.content or ""
+            final_answer = (message.content or "").strip()
+
+            if not final_answer:
+
+                print()
+                print("EMPTY MODEL RESPONSE")
+                print("Requesting final answer...")
+
+                messages.append({
+                "role": "user",
+                "content": (
+                    "Provide the final answer now. "
+                    "Do not call any tools. "
+                    "Return only the concise answer."
+            ),
+        })
+
+                continue
 
             print()
             print("=" * 60)
