@@ -31,7 +31,7 @@ print(f"Loading: {GAIA_LEVEL}")
 dataset = load_dataset(
     "gaia-benchmark/GAIA",
     GAIA_LEVEL,
-    split="validation",
+    split="test",
 )
 
 print(f"Tasks loaded: {len(dataset)}")
@@ -53,7 +53,7 @@ with open(
     encoding="utf-8",
 ) as output:
 
-    for index, task in enumerate(dataset):
+    for index, task in enumerate(dataset.select(range(1))):
         task_id = task["task_id"]
         question = task["Question"]
 
