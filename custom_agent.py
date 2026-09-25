@@ -1,6 +1,22 @@
 import os
+import sys
+import io
 import json
 import time
+
+os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except AttributeError:
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", errors="replace"
+    )
+    sys.stderr = io.TextIOWrapper(
+        sys.stderr.buffer, encoding="utf-8", errors="replace"
+    )
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -32,12 +48,17 @@ MODEL = "openai/gpt-oss-120b"
 # TPM = 8000
 #
 # We intentionally stay below it.MAX_STEPS = 6
-MAX_TOOL_RESULT_CHARS = 800
-MAX_HISTORY_BLOCKS = 3
-SAFE_CONTEXT_CHARS = 10000
+MAX_STEPS = 4
+MAX_TOOL_RESULT_CHARS = 350
+MAX_HISTORY_BLOCKS = 2
 
-MAX_OUTPUT_TOKENS = 250
-MAX_FINAL_TOKENS = 300
+MAX_OUTPUT_TOKENS = 256
+MAX_FINAL_TOKENS = 256
+
+MAX_RETRIES = 1
+SEARCH_MAX_CALLS = 1
+
+SAFE_CONTEXT_CHARS = 14000
 
 
 # ============================================================
@@ -58,13 +79,10 @@ Rules:
 7. Never repeat a failed 403/Forbidden request.
 8. Search at most twice per task.
 9. If a tool result contains enough information, answer immediately.
-10. Do not write reasoning or planning text.
-11. Always provide a final answer.
-12. If information is already available, do not search again.
-13. Do not call unavailable tools such as find, browser, calculator,
-    or find_in_page unless they are explicitly present in the tool list.
-14. If a search result contains the required answer, use it directly.
-15. Prefer concise answers.
+10. Always provide a final answer in the end.
+11. If information is already available, do not search again.
+12. If you cannot use tools or are unsure — just give any short answer.
+13. Prefer concise answers.
 """.strip()
 
 
@@ -1006,42 +1024,38 @@ def run_agent(user_message):
 if __name__ == "__main__":
 
     print("=" * 60)
-    print("ALBERT AGENT")
+    print("ALBERT AGENT (simple test mode)")
     print("=" * 60)
 
-    print(f"Model: {MODEL}")
-    print(f"Tools: {len(ALL_TOOLS)}")
-    print(f"Max steps: {MAX_STEPS}")
-    print(
-        f"Max tool result: "
-        f"{MAX_TOOL_RESULT_CHARS} chars"
-    )
-    print(
-        f"Safe context: "
-        f"{SAFE_CONTEXT_CHARS} chars"
-    )
-
-    print()
-    print("Available tools:")
-
-    for tool in ALL_TOOLS:
-
-        print(
-            f" - {tool.name}"
+    # === SIMPLE DIRECT TEST (no tools) ===
+    try:
+        resp = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. Answer briefly."},
+                {"role": "user", "content": "Say hello and confirm you are working."}
+            ],
+            max_tokens=64,
         )
+        print("MODEL RESPONSE:")
+        print(resp.choices[0].message.content)
+    except Exception as e:
+        print("DIRECT MODEL ERROR:")
+        print(e)
 
-    print()
+    print("=" * 60)
+    print("If you saw a response above, the model works.")
+    print("Now enter your real question (or press Enter to exit).")
     print("=" * 60)
 
-    user_input = input("You: ")
+    user_input = input("You: ").strip()
+    if not user_input:
+        print("No input, exiting.")
+        exit()
 
-    result = run_agent(
-        user_input
-    )
-
+    result = run_agent(user_input)
     print()
     print("=" * 60)
     print("AGENT RESULT")
     print("=" * 60)
-
     print(result)
