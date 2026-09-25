@@ -31,25 +31,13 @@ MODEL = "openai/gpt-oss-120b"
 # Groq limit from your error:
 # TPM = 8000
 #
-# We intentionally stay below it.
-SAFE_CONTEXT_CHARS = 18000
+# We intentionally stay below it.MAX_STEPS = 6
+MAX_TOOL_RESULT_CHARS = 800
+MAX_HISTORY_BLOCKS = 3
+SAFE_CONTEXT_CHARS = 10000
 
-MAX_STEPS = 10
-
-MAX_TOOL_RESULT_CHARS = 1200
-
-MAX_RETRIES = 2
-
-SEARCH_MAX_CALLS = 2
-
-# Keep only this many completed tool exchanges
-MAX_HISTORY_BLOCKS = 5
-
-# Maximum generated tokens per normal request
-MAX_OUTPUT_TOKENS = 400
-
-# Maximum generated tokens for forced final answer
-MAX_FINAL_TOKENS = 500
+MAX_OUTPUT_TOKENS = 250
+MAX_FINAL_TOKENS = 300
 
 
 # ============================================================
