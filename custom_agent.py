@@ -8,9 +8,9 @@ from openai import OpenAI
 from tools import ALL_TOOLS
 
 
-# ==========================================
+# ============================================================
 # CONFIG
-# ==========================================
+# ============================================================
 
 load_dotenv()
 
@@ -28,15 +28,61 @@ client = OpenAI(
 
 MODEL = "openai/gpt-oss-120b"
 
+# Groq limit from your error:
+# TPM = 8000
+#
+# We intentionally stay below it.
+SAFE_CONTEXT_CHARS = 18000
+
 MAX_STEPS = 10
-MAX_TOOL_RESULT_CHARS = 2500
+
+MAX_TOOL_RESULT_CHARS = 1200
+
 MAX_RETRIES = 2
+
 SEARCH_MAX_CALLS = 2
 
+# Keep only this many completed tool exchanges
+MAX_HISTORY_BLOCKS = 5
 
-# ==========================================
+# Maximum generated tokens per normal request
+MAX_OUTPUT_TOKENS = 400
+
+# Maximum generated tokens for forced final answer
+MAX_FINAL_TOKENS = 500
+
+
+# ============================================================
+# SYSTEM PROMPT
+# ============================================================
+
+SYSTEM_PROMPT = """
+You are Albert, an efficient AI agent solving GAIA benchmark tasks.
+
+Rules:
+
+1. Use tools only when necessary.
+2. Only use tools from the provided tool list.
+3. Never invent tool names.
+4. Use search for factual web information.
+5. Use execute_python_code for calculations.
+6. Do not repeat the same tool call.
+7. Never repeat a failed 403/Forbidden request.
+8. Search at most twice per task.
+9. If a tool result contains enough information, answer immediately.
+10. Do not write reasoning or planning text.
+11. Always provide a final answer.
+12. If information is already available, do not search again.
+13. Do not call unavailable tools such as find, browser, calculator,
+    or find_in_page unless they are explicitly present in the tool list.
+14. If a search result contains the required answer, use it directly.
+15. Prefer concise answers.
+""".strip()
+
+
+# ============================================================
 # TOOL SCHEMAS
-# ==========================================
+# ============================================================
 
 def build_tool_schemas(tools):
 
@@ -60,9 +106,9 @@ def build_tool_schemas(tools):
     return schemas
 
 
-# ==========================================
+# ============================================================
 # TOOL MAP
-# ==========================================
+# ============================================================
 
 TOOL_MAP = {
     tool.name: tool
@@ -70,9 +116,9 @@ TOOL_MAP = {
 }
 
 
-# ==========================================
+# ============================================================
 # TOOL EXECUTION
-# ==========================================
+# ============================================================
 
 def execute_tool(name, arguments):
 
@@ -117,11 +163,290 @@ def execute_tool(name, arguments):
         return error
 
 
-# ==========================================
-# GROQ REQUEST
-# ==========================================
+# ============================================================
+# MESSAGE SIZE
+# ============================================================
+
+def message_size(message):
+
+    try:
+        return len(
+            json.dumps(
+                message,
+                ensure_ascii=False,
+            )
+        )
+    except Exception:
+        return len(str(message))
+
+
+def messages_size(messages):
+
+    return sum(
+        message_size(message)
+        for message in messages
+    )
+
+
+# ============================================================
+# HISTORY BLOCKS
+#
+# A tool exchange is:
+#
+# assistant
+#   └── tool_calls
+#
+# tool
+#   └── tool_call_id
+#
+# We NEVER keep the tool message without its assistant
+# tool-call message.
+# ============================================================
+
+def split_history_into_blocks(messages):
+
+    if not messages:
+        return []
+
+    blocks = []
+
+    current = []
+
+    for message in messages:
+
+        role = message.get("role")
+
+        # System and initial user message are handled separately.
+        if role in ("system", "user"):
+
+            if current:
+                blocks.append(current)
+                current = []
+
+            blocks.append([message])
+
+            continue
+
+        # Assistant with tool calls starts a new exchange.
+        if (
+            role == "assistant"
+            and message.get("tool_calls")
+        ):
+
+            if current:
+                blocks.append(current)
+
+            current = [message]
+
+            continue
+
+        # Tool belongs to current assistant tool call.
+        if role == "tool":
+
+            current.append(message)
+            continue
+
+        # Normal assistant final answer.
+        if role == "assistant":
+
+            if current:
+                blocks.append(current)
+
+            current = [message]
+
+            continue
+
+        current.append(message)
+
+    if current:
+        blocks.append(current)
+
+    return blocks
+
+
+# ============================================================
+# COMPACT HISTORY
+# ============================================================
+
+def compact_messages(messages):
+
+    if not messages:
+        return messages
+
+    # --------------------------------------------
+    # Keep system message
+    # --------------------------------------------
+
+    system_messages = [
+        m
+        for m in messages
+        if m.get("role") == "system"
+    ]
+
+    # --------------------------------------------
+    # Keep original user task
+    # --------------------------------------------
+
+    user_messages = [
+        m
+        for m in messages
+        if m.get("role") == "user"
+    ]
+
+    original_user = (
+        user_messages[0]
+        if user_messages
+        else None
+    )
+
+    # --------------------------------------------
+    # Find actual conversation blocks
+    # --------------------------------------------
+
+    blocks = split_history_into_blocks(messages)
+
+    # Remove system/user blocks.
+    conversation_blocks = []
+
+    for block in blocks:
+
+        if all(
+            m.get("role") not in ("system", "user")
+            for m in block
+        ):
+            conversation_blocks.append(block)
+
+    # --------------------------------------------
+    # Keep latest blocks
+    # --------------------------------------------
+
+    conversation_blocks = conversation_blocks[
+        -MAX_HISTORY_BLOCKS:
+    ]
+
+    compacted = []
+
+    compacted.extend(system_messages)
+
+    if original_user:
+        compacted.append(original_user)
+
+    # --------------------------------------------
+    # Add recent conversation
+    # --------------------------------------------
+
+    for block in conversation_blocks:
+
+        compacted.extend(block)
+
+    # --------------------------------------------
+    # Hard character safety
+    # --------------------------------------------
+
+    while (
+        messages_size(compacted)
+        > SAFE_CONTEXT_CHARS
+        and len(conversation_blocks) > 1
+    ):
+
+        conversation_blocks.pop(0)
+
+        compacted = []
+
+        compacted.extend(system_messages)
+
+        if original_user:
+            compacted.append(original_user)
+
+        for block in conversation_blocks:
+            compacted.extend(block)
+
+    print()
+    print(
+        f"CONTEXT SIZE: "
+        f"{messages_size(compacted)} chars"
+    )
+
+    return compacted
+
+
+# ============================================================
+# BUILD REQUEST MESSAGES
+# ============================================================
+
+def prepare_messages(messages):
+
+    compacted = compact_messages(messages)
+
+    # Additional emergency protection.
+    #
+    # If still too large, keep:
+    # system
+    # original user
+    # latest complete tool blocks
+    #
+
+    if messages_size(compacted) <= SAFE_CONTEXT_CHARS:
+        return compacted
+
+    system = next(
+        (
+            m
+            for m in compacted
+            if m.get("role") == "system"
+        ),
+        None,
+    )
+
+    users = [
+        m
+        for m in compacted
+        if m.get("role") == "user"
+    ]
+
+    original_user = users[0] if users else None
+
+    blocks = split_history_into_blocks(compacted)
+
+    conversation = [
+        block
+        for block in blocks
+        if all(
+            m.get("role") not in ("system", "user")
+            for m in block
+        )
+    ]
+
+    result = []
+
+    if system:
+        result.append(system)
+
+    if original_user:
+        result.append(original_user)
+
+    # Add only newest complete block.
+    if conversation:
+        result.extend(conversation[-1])
+
+    return result
+
+
+# ============================================================
+# GROQ COMPLETION
+# ============================================================
 
 def create_completion(messages, tool_schemas):
+
+    request_messages = prepare_messages(messages)
+
+    request_size = messages_size(request_messages)
+
+    print()
+    print(
+        f"REQUEST SIZE: "
+        f"{request_size} chars"
+    )
 
     for attempt in range(1, MAX_RETRIES + 1):
 
@@ -129,19 +454,95 @@ def create_completion(messages, tool_schemas):
 
             return client.chat.completions.create(
                 model=MODEL,
-                messages=messages,
+                messages=request_messages,
                 tools=tool_schemas,
                 tool_choice="auto",
-                max_tokens=700,
+                max_tokens=MAX_OUTPUT_TOKENS,
             )
 
         except Exception as e:
 
             error_text = str(e).lower()
 
-            # ==================================
+            # ==========================================
+            # TPM / REQUEST TOO LARGE
+            # ==========================================
+
+            if (
+                "tokens per minute" in error_text
+                or "tpm" in error_text
+                or "request too large" in error_text
+                or "413" in error_text
+            ):
+
+                print()
+                print("=" * 60)
+                print("GROQ REQUEST TOO LARGE")
+                print("=" * 60)
+                print(e)
+
+                # Emergency retry with only essential context.
+                if attempt < MAX_RETRIES:
+
+                    emergency = []
+
+                    system = next(
+                        (
+                            m
+                            for m in messages
+                            if m.get("role") == "system"
+                        ),
+                        None,
+                    )
+
+                    user = next(
+                        (
+                            m
+                            for m in messages
+                            if m.get("role") == "user"
+                        ),
+                        None,
+                    )
+
+                    if system:
+                        emergency.append(system)
+
+                    if user:
+                        emergency.append(user)
+
+                    # Add newest COMPLETE tool exchange.
+                    blocks = split_history_into_blocks(
+                        messages
+                    )
+
+                    valid_blocks = [
+                        block
+                        for block in blocks
+                        if all(
+                            m.get("role")
+                            not in ("system", "user")
+                            for m in block
+                        )
+                    ]
+
+                    if valid_blocks:
+                        emergency.extend(
+                            valid_blocks[-1]
+                        )
+
+                    request_messages = emergency
+
+                    print(
+                        "Retrying with emergency compact context..."
+                    )
+
+                    continue
+
+                raise
+
+            # ==========================================
             # DAILY TOKEN LIMIT
-            # ==================================
+            # ==========================================
 
             if (
                 "tokens per day" in error_text
@@ -149,16 +550,15 @@ def create_completion(messages, tool_schemas):
             ):
 
                 print()
-                print("=" * 60)
-                print("GROQ DAILY TOKEN LIMIT REACHED")
-                print("=" * 60)
-                print(e)
+                print(
+                    "GROQ DAILY TOKEN LIMIT REACHED"
+                )
 
                 raise
 
-            # ==================================
+            # ==========================================
             # RATE LIMIT
-            # ==================================
+            # ==========================================
 
             if (
                 "429" in error_text
@@ -170,9 +570,8 @@ def create_completion(messages, tool_schemas):
 
                 wait_time = attempt * 5
 
-                print()
                 print(
-                    f"Temporary rate limit. "
+                    f"Rate limit. "
                     f"Retrying in {wait_time}s..."
                 )
 
@@ -180,16 +579,16 @@ def create_completion(messages, tool_schemas):
 
                 continue
 
-            # ==================================
+            # ==========================================
             # OUTPUT PARSE ERROR
-            # ==================================
+            # ==========================================
 
             if "output_parse_failed" in error_text:
 
                 print()
-                print("=" * 60)
-                print("GROQ OUTPUT PARSING ERROR")
-                print("=" * 60)
+                print(
+                    "GROQ OUTPUT PARSING ERROR"
+                )
                 print(e)
 
                 if attempt == MAX_RETRIES:
@@ -198,11 +597,8 @@ def create_completion(messages, tool_schemas):
                 messages.append({
                     "role": "user",
                     "content": (
-                        "Your previous response could not be parsed.\n"
-                        "Do not write reasoning or planning text.\n"
-                        "Use the available tools correctly.\n"
-                        "If enough information is already available, "
-                        "provide the final answer immediately."
+                        "Give a valid tool call or final answer. "
+                        "Do not output reasoning."
                     ),
                 })
 
@@ -211,9 +607,9 @@ def create_completion(messages, tool_schemas):
             raise
 
 
-# ==========================================
+# ============================================================
 # FORCE FINAL ANSWER
-# ==========================================
+# ============================================================
 
 def force_final_answer(messages):
 
@@ -222,37 +618,110 @@ def force_final_answer(messages):
     print("FORCING FINAL ANSWER")
     print("=" * 60)
 
-    final_messages = messages.copy()
+    # --------------------------------------------
+    # Build compact final context.
+    # --------------------------------------------
 
-    final_messages.append({
+    compacted = prepare_messages(messages)
+
+    compacted.append({
         "role": "user",
         "content": (
-            "You must provide the final answer now.\n\n"
-            "Do NOT call any tools.\n"
+            "Provide the final answer now.\n"
+            "Do NOT call tools.\n"
             "Do NOT search.\n"
-            "Do NOT perform additional actions.\n"
-            "Use only the information already present "
-            "in the conversation.\n\n"
-            "Return only the final concise answer."
+            "Use only information already obtained.\n"
+            "Return only the concise final answer."
         ),
     })
+
+    # --------------------------------------------
+    # Emergency context protection.
+    # --------------------------------------------
+
+    while (
+        messages_size(compacted)
+        > SAFE_CONTEXT_CHARS
+    ):
+
+        # Keep system + original user + newest block.
+        system = next(
+            (
+                m
+                for m in compacted
+                if m.get("role") == "system"
+            ),
+            None,
+        )
+
+        users = [
+            m
+            for m in compacted
+            if m.get("role") == "user"
+        ]
+
+        original_user = (
+            users[0]
+            if users
+            else None
+        )
+
+        final_instruction = compacted[-1]
+
+        blocks = split_history_into_blocks(
+            compacted[:-1]
+        )
+
+        conversation = [
+            block
+            for block in blocks
+            if all(
+                m.get("role")
+                not in ("system", "user")
+                for m in block
+            )
+        ]
+
+        compacted = []
+
+        if system:
+            compacted.append(system)
+
+        if original_user:
+            compacted.append(original_user)
+
+        if conversation:
+            compacted.extend(
+                conversation[-1]
+            )
+
+        compacted.append(
+            final_instruction
+        )
+
+        break
 
     try:
 
         response = client.chat.completions.create(
             model=MODEL,
-            messages=final_messages,
+            messages=compacted,
             tool_choice="none",
-            max_tokens=700,
+            max_tokens=MAX_FINAL_TOKENS,
         )
 
         answer = (
-            response.choices[0].message.content or ""
+            response.choices[0].message.content
+            or ""
         ).strip()
 
         if answer:
+
             print()
-            print("FINAL ANSWER:")
+            print("=" * 60)
+            print("FINAL ANSWER")
+            print("=" * 60)
+
             print(answer)
 
             return answer
@@ -269,9 +738,9 @@ def force_final_answer(messages):
     )
 
 
-# ==========================================
+# ============================================================
 # AGENT
-# ==========================================
+# ============================================================
 
 def run_agent(user_message):
 
@@ -279,70 +748,7 @@ def run_agent(user_message):
 
         {
             "role": "system",
-            "content": (
-                "You are Albert, an efficient AI agent solving "
-                "GAIA benchmark tasks.\n\n"
-
-                "Rules:\n\n"
-
-                "1. Use tools only when necessary.\n\n"
-
-                "2. You may ONLY call tools that are present "
-                "in the provided tool list. Never invent a tool name.\n\n"
-
-                "3. Available tools include search, "
-                "visit_webpage, execute_python_code, and other "
-                "tools provided by the API.\n\n"
-
-                "4. For arithmetic and calculations, use "
-                "execute_python_code.\n\n"
-
-                "5. For factual web information, use search first.\n\n"
-
-                "6. If search results already contain the required "
-                "information, do not search again.\n\n"
-
-                "7. Never repeat the exact same tool call.\n\n"
-
-                "8. If a tool returns 403 Forbidden or an access "
-                "error, never repeat the same request.\n\n"
-
-                "9. Once a tool result contains enough information "
-                "to answer the question, stop using tools and "
-                "provide the final answer.\n\n"
-
-                "10. Do not write reasoning or planning text.\n\n"
-
-                "11. If you need a tool, call it directly.\n\n"
-
-                "12. After receiving a tool result, either call "
-                "another necessary tool or provide the final answer.\n\n"
-
-                "13. Never output internal reasoning.\n\n"
-
-                "14. If search returns empty results, you may try "
-                "one different search query.\n\n"
-
-                "15. Search may be used at most twice per task.\n\n"
-
-                "16. Never finish with an empty response.\n\n"
-
-                "17. If enough information is available, "
-                "always provide a concise final answer.\n\n"
-
-                "18. If fetch_json_api returns 403, Forbidden, "
-                "or an access error, do not retry it. "
-                "Use search or another available tool instead.\n\n"
-
-                "19. Do not call find, find_in_page, browser, "
-                "calculator, or any tool that is not explicitly "
-                "provided.\n\n"
-
-                "20. When a search result contains a useful URL, "
-                "you may use visit_webpage to retrieve it.\n\n"
-
-                "21. Do not perform unnecessary searches."
-            ),
+            "content": SYSTEM_PROMPT,
         },
 
         {
@@ -351,24 +757,33 @@ def run_agent(user_message):
         },
     ]
 
-    tool_schemas = build_tool_schemas(ALL_TOOLS)
+    tool_schemas = build_tool_schemas(
+        ALL_TOOLS
+    )
 
-    # ======================================
+    # ==========================================
     # TRACKING
-    # ======================================
+    # ==========================================
 
     tool_history = set()
+
     search_calls = 0
 
-    # ======================================
+    # ==========================================
     # AGENT LOOP
-    # ======================================
+    # ==========================================
 
-    for step in range(1, MAX_STEPS + 1):
+    for step in range(
+        1,
+        MAX_STEPS + 1,
+    ):
 
         print()
         print("#" * 60)
-        print(f"AGENT STEP {step}/{MAX_STEPS}")
+        print(
+            f"AGENT STEP "
+            f"{step}/{MAX_STEPS}"
+        )
         print("#" * 60)
 
         try:
@@ -392,9 +807,9 @@ def run_agent(user_message):
 
         message = response.choices[0].message
 
-        # ==================================
+        # ==========================================
         # FINAL ANSWER
-        # ==================================
+        # ==========================================
 
         if not message.tool_calls:
 
@@ -413,32 +828,33 @@ def run_agent(user_message):
 
                 return final_answer
 
-            # Empty response
+            # Empty model response
 
             print()
             print("EMPTY MODEL RESPONSE")
-            print("Requesting final answer...")
 
             messages.append({
                 "role": "user",
                 "content": (
-                    "Provide the final answer now.\n"
-                    "Do not call any tools.\n"
+                    "Provide the final answer now. "
+                    "Do not call tools. "
                     "Return only the concise answer."
                 ),
             })
 
             continue
 
-        # ==================================
+        # ==========================================
         # ASSISTANT TOOL CALL
-        # ==================================
+        # ==========================================
 
-        messages.append({
+        assistant_tool_message = {
 
             "role": "assistant",
 
-            "content": message.content or "",
+            "content": (
+                message.content or ""
+            ),
 
             "tool_calls": [
 
@@ -448,42 +864,58 @@ def run_agent(user_message):
                     "type": "function",
 
                     "function": {
+
                         "name": call.function.name,
-                        "arguments": call.function.arguments,
+
+                        "arguments": (
+                            call.function.arguments
+                        ),
                     },
                 }
 
                 for call in message.tool_calls
             ],
-        })
+        }
 
-        # ==================================
+        messages.append(
+            assistant_tool_message
+        )
+
+        # ==========================================
         # EXECUTE TOOLS
-        # ==================================
+        # ==========================================
 
         for call in message.tool_calls:
 
-            tool_name = call.function.name
-            raw_arguments = call.function.arguments
+            tool_name = (
+                call.function.name
+            )
+
+            raw_arguments = (
+                call.function.arguments
+            )
 
             print()
             print("RAW TOOL ARGUMENTS:")
             print(raw_arguments)
 
-            # ==================================
+            # ======================================
             # SEARCH LIMIT
-            # ==================================
+            # ======================================
 
             if tool_name == "search":
 
                 search_calls += 1
 
-                if search_calls > SEARCH_MAX_CALLS:
+                if (
+                    search_calls
+                    > SEARCH_MAX_CALLS
+                ):
 
                     result = (
-                        "SEARCH LIMIT REACHED.\n"
-                        "Do not perform another search.\n"
-                        "Use the information already obtained "
+                        "SEARCH LIMIT REACHED. "
+                        "Do not search again. "
+                        "Use information already obtained "
                         "and provide the final answer."
                     )
 
@@ -495,9 +927,9 @@ def run_agent(user_message):
 
                     continue
 
-            # ==================================
-            # PARSE JSON
-            # ==================================
+            # ======================================
+            # JSON PARSE
+            # ======================================
 
             try:
 
@@ -509,7 +941,7 @@ def run_agent(user_message):
 
                 result = (
                     "INVALID TOOL ARGUMENTS.\n"
-                    "The arguments must be valid JSON.\n"
+                    "Arguments must be valid JSON.\n"
                     "Do not repeat the same invalid call.\n"
                     f"JSON error: {e}"
                 )
@@ -517,14 +949,17 @@ def run_agent(user_message):
             else:
 
                 # ==================================
-                # DUPLICATE TOOL CALL PROTECTION
+                # DUPLICATE CALL PROTECTION
                 # ==================================
 
                 tool_key = (
+
                     tool_name,
+
                     json.dumps(
                         arguments,
                         sort_keys=True,
+                        ensure_ascii=False,
                     ),
                 )
 
@@ -532,15 +967,17 @@ def run_agent(user_message):
 
                     result = (
                         "DUPLICATE TOOL CALL.\n"
-                        "This exact tool call was already executed.\n"
-                        "Do not call it again.\n"
-                        "Use the previous result and provide "
-                        "the final answer."
+                        "This exact tool call was already "
+                        "executed.\n"
+                        "Do not repeat it.\n"
+                        "Use the previous result and answer."
                     )
 
                 else:
 
-                    tool_history.add(tool_key)
+                    tool_history.add(
+                        tool_key
+                    )
 
                     result = execute_tool(
                         tool_name,
@@ -569,12 +1006,14 @@ def run_agent(user_message):
     print("MAX STEPS REACHED")
     print("=" * 60)
 
-    return force_final_answer(messages)
+    return force_final_answer(
+        messages
+    )
 
 
-# ==========================================
+# ============================================================
 # MAIN
-# ==========================================
+# ============================================================
 
 if __name__ == "__main__":
 
@@ -585,22 +1024,36 @@ if __name__ == "__main__":
     print(f"Model: {MODEL}")
     print(f"Tools: {len(ALL_TOOLS)}")
     print(f"Max steps: {MAX_STEPS}")
+    print(
+        f"Max tool result: "
+        f"{MAX_TOOL_RESULT_CHARS} chars"
+    )
+    print(
+        f"Safe context: "
+        f"{SAFE_CONTEXT_CHARS} chars"
+    )
 
     print()
     print("Available tools:")
 
     for tool in ALL_TOOLS:
-        print(f" - {tool.name}")
+
+        print(
+            f" - {tool.name}"
+        )
 
     print()
     print("=" * 60)
 
     user_input = input("You: ")
 
-    result = run_agent(user_input)
+    result = run_agent(
+        user_input
+    )
 
     print()
     print("=" * 60)
     print("AGENT RESULT")
     print("=" * 60)
+
     print(result)
