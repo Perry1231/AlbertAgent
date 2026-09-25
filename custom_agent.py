@@ -28,9 +28,10 @@ client = OpenAI(
 
 MODEL = "openai/gpt-oss-120b"
 
-MAX_STEPS = 8
+MAX_STEPS = 10
 MAX_TOOL_RESULT_CHARS = 2500
 MAX_RETRIES = 2
+SEARCH_MAX_CALLS = 2
 
 
 # ==========================================
@@ -68,7 +69,6 @@ TOOL_MAP = {
     for tool in ALL_TOOLS
 }
 
-SEARCH_MAX_CALLS = 2
 
 # ==========================================
 # TOOL EXECUTION
@@ -132,7 +132,7 @@ def create_completion(messages, tool_schemas):
                 messages=messages,
                 tools=tool_schemas,
                 tool_choice="auto",
-                max_tokens=400,
+                max_tokens=700,
             )
 
         except Exception as e:
@@ -140,7 +140,7 @@ def create_completion(messages, tool_schemas):
             error_text = str(e).lower()
 
             # ==================================
-            # GROQ DAILY TOKEN LIMIT
+            # DAILY TOKEN LIMIT
             # ==================================
 
             if (
@@ -157,7 +157,7 @@ def create_completion(messages, tool_schemas):
                 raise
 
             # ==================================
-            # TEMPORARY RATE LIMIT
+            # RATE LIMIT
             # ==================================
 
             if (
@@ -195,29 +195,78 @@ def create_completion(messages, tool_schemas):
                 if attempt == MAX_RETRIES:
                     raise
 
-                # Add an instruction for the next attempt.
                 messages.append({
                     "role": "user",
                     "content": (
-                        "Your previous response could not be parsed. "
-                        "Do not write reasoning or planning text. "
-                        "If a tool returns enough information to "
-                        "solve the task, calculate the answer and "
-                        "finish immediately.\n\n"
-
-                        "If a search result contains the required "
-                        "numerical value, do not search again. Use "
-                        "execute_python_code for the calculation if needed.\n\n"
+                        "Your previous response could not be parsed.\n"
+                        "Do not write reasoning or planning text.\n"
+                        "Use the available tools correctly.\n"
+                        "If enough information is already available, "
+                        "provide the final answer immediately."
                     ),
                 })
 
                 continue
 
-            # ==================================
-            # OTHER API ERROR
-            # ==================================
-
             raise
+
+
+# ==========================================
+# FORCE FINAL ANSWER
+# ==========================================
+
+def force_final_answer(messages):
+
+    print()
+    print("=" * 60)
+    print("FORCING FINAL ANSWER")
+    print("=" * 60)
+
+    final_messages = messages.copy()
+
+    final_messages.append({
+        "role": "user",
+        "content": (
+            "You must provide the final answer now.\n\n"
+            "Do NOT call any tools.\n"
+            "Do NOT search.\n"
+            "Do NOT perform additional actions.\n"
+            "Use only the information already present "
+            "in the conversation.\n\n"
+            "Return only the final concise answer."
+        ),
+    })
+
+    try:
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=final_messages,
+            tool_choice="none",
+            max_tokens=700,
+        )
+
+        answer = (
+            response.choices[0].message.content or ""
+        ).strip()
+
+        if answer:
+            print()
+            print("FINAL ANSWER:")
+            print(answer)
+
+            return answer
+
+    except Exception as e:
+
+        print()
+        print("FINALIZATION ERROR:")
+        print(e)
+
+    return (
+        "Unable to produce a final answer "
+        "within the available execution limits."
+    )
 
 
 # ==========================================
@@ -236,75 +285,63 @@ def run_agent(user_message):
 
                 "Rules:\n\n"
 
-"1. Use tools only when necessary.\n\n"
+                "1. Use tools only when necessary.\n\n"
 
-"2. You may ONLY call tools that are present in the "
-"provided tool list. Never invent a tool name.\n\n"
+                "2. You may ONLY call tools that are present "
+                "in the provided tool list. Never invent a tool name.\n\n"
 
-"3. Available tools include search, visit_webpage, "
-"execute_python_code, and other tools provided by the API. "
-"Do not call find, find_in_page, browser, calculator, "
-"or any other tool unless it is explicitly provided.\n\n"
+                "3. Available tools include search, "
+                "visit_webpage, execute_python_code, and other "
+                "tools provided by the API.\n\n"
 
-"4. For arithmetic and calculations, use "
-"execute_python_code.\n\n"
+                "4. For arithmetic and calculations, use "
+                "execute_python_code.\n\n"
 
-"5. For factual web information, use search first. "
-"Use visit_webpage only for URLs that are accessible. "
-"Do not assume Wikipedia is required just because the "
-"question mentions information commonly found there.\n\n"
+                "5. For factual web information, use search first.\n\n"
 
-"6. If search results already contain the required "
-"information, do not search again and do not try to "
-"find text inside the result. Use the information directly.\n\n"
+                "6. If search results already contain the required "
+                "information, do not search again.\n\n"
 
-"7. Do not repeat the same search unless the previous "
-"result was insufficient.\n\n"
+                "7. Never repeat the exact same tool call.\n\n"
 
-"8. Once a tool result contains enough information to "
-"answer the question, STOP calling tools and immediately "
-"provide the final answer.\n\n"
+                "8. If a tool returns 403 Forbidden or an access "
+                "error, never repeat the same request.\n\n"
 
-"9. If a search result contains the answer explicitly, "
-"return that answer directly. Do not search for the same "
-"information again.\n\n"
+                "9. Once a tool result contains enough information "
+                "to answer the question, stop using tools and "
+                "provide the final answer.\n\n"
 
-"10. For numerical calculations, prefer "
-"execute_python_code rather than mental arithmetic.\n\n"
+                "10. Do not write reasoning or planning text.\n\n"
 
-"11. Do not write reasoning or planning text before "
-"a tool call.\n\n"
+                "11. If you need a tool, call it directly.\n\n"
 
-"12. If you need a tool, call it directly.\n\n"
+                "12. After receiving a tool result, either call "
+                "another necessary tool or provide the final answer.\n\n"
 
-"13. After receiving a tool result, either call another "
-"available tool or provide the final answer.\n\n"
+                "13. Never output internal reasoning.\n\n"
 
-"14. Never output internal reasoning as plain text."
+                "14. If search returns empty results, you may try "
+                "one different search query.\n\n"
 
-"15. If a search returns empty results, try a different "
-"search query once. Do not repeatedly call the same empty search.\n\n"
+                "15. Search may be used at most twice per task.\n\n"
 
-"16. Never finish with an empty response. If you have "
-"enough information, always provide a concise textual answer.\n\n"
+                "16. Never finish with an empty response.\n\n"
 
-"17. Use search at most twice for a task. After "
-"two searches, use the information already obtained "
-"and provide the final answer.\n\n"
+                "17. If enough information is available, "
+                "always provide a concise final answer.\n\n"
 
-"18. If fetch_json_api returns a 403, Forbidden, or access "
-"error, do not retry the same API request. Use search or "
-"visit_webpage instead.\n\n"
+                "18. If fetch_json_api returns 403, Forbidden, "
+                "or an access error, do not retry it. "
+                "Use search or another available tool instead.\n\n"
 
-"19. Never repeat a tool call that failed with 403 Forbidden. "
-"Use another available source or method.\n\n"
+                "19. Do not call find, find_in_page, browser, "
+                "calculator, or any tool that is not explicitly "
+                "provided.\n\n"
 
-"20. When a search result provides a useful webpage URL, "
-"prefer visit_webpage to retrieve the page content. "
-"Do not use a JSON API unless it is clearly necessary.\n\n"
+                "20. When a search result contains a useful URL, "
+                "you may use visit_webpage to retrieve it.\n\n"
 
-"21. Use web search only when necessary and do not perform "
-"more than two searches for the same task.\n\n"
+                "21. Do not perform unnecessary searches."
             ),
         },
 
@@ -315,6 +352,13 @@ def run_agent(user_message):
     ]
 
     tool_schemas = build_tool_schemas(ALL_TOOLS)
+
+    # ======================================
+    # TRACKING
+    # ======================================
+
+    tool_history = set()
+    search_calls = 0
 
     # ======================================
     # AGENT LOOP
@@ -354,33 +398,37 @@ def run_agent(user_message):
 
         if not message.tool_calls:
 
-            final_answer = (message.content or "").strip()
+            final_answer = (
+                message.content or ""
+            ).strip()
 
-            if not final_answer:
+            if final_answer:
 
                 print()
-                print("EMPTY MODEL RESPONSE")
-                print("Requesting final answer...")
+                print("=" * 60)
+                print("FINAL ANSWER")
+                print("=" * 60)
 
-                messages.append({
-                "role": "user",
-                "content": (
-                    "Provide the final answer now. "
-                    "Do not call any tools. "
-                    "Return only the concise answer."
-            ),
-        })
+                print(final_answer)
 
-                continue
+                return final_answer
+
+            # Empty response
 
             print()
-            print("=" * 60)
-            print("FINAL ANSWER")
-            print("=" * 60)
+            print("EMPTY MODEL RESPONSE")
+            print("Requesting final answer...")
 
-            print(final_answer)
+            messages.append({
+                "role": "user",
+                "content": (
+                    "Provide the final answer now.\n"
+                    "Do not call any tools.\n"
+                    "Return only the concise answer."
+                ),
+            })
 
-            return final_answer
+            continue
 
         # ==================================
         # ASSISTANT TOOL CALL
@@ -415,32 +463,93 @@ def run_agent(user_message):
 
         for call in message.tool_calls:
 
+            tool_name = call.function.name
             raw_arguments = call.function.arguments
 
             print()
             print("RAW TOOL ARGUMENTS:")
             print(raw_arguments)
 
+            # ==================================
+            # SEARCH LIMIT
+            # ==================================
+
+            if tool_name == "search":
+
+                search_calls += 1
+
+                if search_calls > SEARCH_MAX_CALLS:
+
+                    result = (
+                        "SEARCH LIMIT REACHED.\n"
+                        "Do not perform another search.\n"
+                        "Use the information already obtained "
+                        "and provide the final answer."
+                    )
+
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": result,
+                    })
+
+                    continue
+
+            # ==================================
+            # PARSE JSON
+            # ==================================
+
             try:
 
-                arguments = json.loads(raw_arguments)
+                arguments = json.loads(
+                    raw_arguments
+                )
 
             except json.JSONDecodeError as e:
 
                 result = (
                     "INVALID TOOL ARGUMENTS.\n"
                     "The arguments must be valid JSON.\n"
-                    "Do not call the tool again with "
-                    "the same invalid arguments.\n"
+                    "Do not repeat the same invalid call.\n"
                     f"JSON error: {e}"
                 )
 
             else:
 
-                result = execute_tool(
-                    call.function.name,
-                    arguments,
+                # ==================================
+                # DUPLICATE TOOL CALL PROTECTION
+                # ==================================
+
+                tool_key = (
+                    tool_name,
+                    json.dumps(
+                        arguments,
+                        sort_keys=True,
+                    ),
                 )
+
+                if tool_key in tool_history:
+
+                    result = (
+                        "DUPLICATE TOOL CALL.\n"
+                        "This exact tool call was already executed.\n"
+                        "Do not call it again.\n"
+                        "Use the previous result and provide "
+                        "the final answer."
+                    )
+
+                else:
+
+                    tool_history.add(tool_key)
+
+                    result = execute_tool(
+                        tool_name,
+                        arguments,
+                    )
+
+            # ==================================
+            # TOOL RESULT
+            # ==================================
 
             messages.append({
 
@@ -451,14 +560,16 @@ def run_agent(user_message):
                 "content": str(result),
             })
 
-    # ======================================
+    # ==========================================
     # MAX STEPS
-    # ======================================
+    # ==========================================
 
-    return (
-        "Agent stopped because MAX_STEPS was reached. "
-        "No final answer was produced."
-    )
+    print()
+    print("=" * 60)
+    print("MAX STEPS REACHED")
+    print("=" * 60)
+
+    return force_final_answer(messages)
 
 
 # ==========================================
@@ -486,4 +597,10 @@ if __name__ == "__main__":
 
     user_input = input("You: ")
 
-    run_agent(user_input)
+    result = run_agent(user_input)
+
+    print()
+    print("=" * 60)
+    print("AGENT RESULT")
+    print("=" * 60)
+    print(result)
