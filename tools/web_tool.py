@@ -1,7 +1,22 @@
 from smolagents import tool
 
+import io
 import requests
 from bs4 import BeautifulSoup
+
+
+MAX_WEB_TEXT = 1000
+MAX_SEARCH_RESULTS = 5
+
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    )
+}
 
 
 # ==========================================
@@ -24,7 +39,7 @@ def search(query: str, top_n: int = 5) -> str:
     try:
         from ddgs import DDGS
 
-        top_n = max(1, min(top_n, 5))
+        top_n = max(1, min(top_n, MAX_SEARCH_RESULTS))
 
         results = DDGS().text(
             query,
@@ -57,43 +72,112 @@ def search(query: str, top_n: int = 5) -> str:
         return "\n\n".join(output)
 
     except Exception as e:
+        return f"Search error: {type(e).__name__}: {e}"
 
+
+# ==========================================
+# PDF EXTRACTION
+# ==========================================
+
+def extract_pdf_text(content: bytes) -> str:
+    """
+    Extract readable text from a PDF.
+    """
+
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(content))
+
+        pages = []
+
+        # Do not process enormous PDFs.
+        for page in reader.pages[:10]:
+
+            try:
+                text = page.extract_text()
+
+                if text:
+                    pages.append(text)
+
+            except Exception:
+                continue
+
+        if not pages:
+            return "PDF was opened, but no readable text could be extracted."
+
+        text = "\n\n".join(pages)
+
+        return text[:MAX_WEB_TEXT]
+
+    except ImportError:
         return (
-            f"Search error: "
+            "PDF detected, but pypdf is not installed. "
+            "Install it with: pip install pypdf"
+        )
+
+    except Exception as e:
+        return (
+            f"PDF extraction error: "
             f"{type(e).__name__}: {e}"
         )
-    
-    
+
+
+# ==========================================
+# WEBPAGE
+# ==========================================
+
 @tool
 def visit_webpage(url: str) -> str:
+    
     """
-    Visits a webpage and returns its text content.
+    Visits a webpage or PDF and returns readable text content.
 
     Args:
-        url: URL of the webpage to visit.
+        url: URL to visit.
 
     Returns:
-        Extracted text from the webpage.
+        Extracted webpage or PDF text.
     """
 
     try:
 
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 "
-                "(KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            )
-        }
-
         response = requests.get(
             url,
-            headers=headers,
+            headers=HEADERS,
             timeout=15,
         )
 
         response.raise_for_status()
+
+        content_type = (
+            response.headers
+            .get("Content-Type", "")
+            .lower()
+        )
+
+        # ======================================
+        # PDF
+        # ======================================
+
+        if (
+            "application/pdf" in content_type
+            or url.lower().split("?")[0].endswith(".pdf")
+        ):
+
+            text = extract_pdf_text(
+                response.content
+            )
+
+            return (
+                f"PDF DOCUMENT\n"
+                f"URL: {url}\n\n"
+                f"{text}"
+            )
+
+        # ======================================
+        # HTML
+        # ======================================
 
         soup = BeautifulSoup(
             response.text,
@@ -113,7 +197,7 @@ def visit_webpage(url: str) -> str:
         if not text:
             return "No text content found."
 
-        return text[:12000]
+        return text[:MAX_WEB_TEXT]
 
     except Exception as e:
 
@@ -133,34 +217,61 @@ def smart_web_scraper(
     prompt: str,
 ) -> str:
     """
-    Scrapes structured information from a webpage.
+    Scrapes a webpage or PDF and returns relevant readable content.
 
     Args:
         url: URL to scrape.
         prompt: Description of the data to extract.
 
     Returns:
-        Webpage text that can be analyzed according to the prompt.
+        Extracted content.
     """
 
     try:
 
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 "
-                "(KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            )
-        }
-
         response = requests.get(
             url,
-            headers=headers,
+            headers=HEADERS,
             timeout=15,
         )
 
         response.raise_for_status()
+
+        content_type = (
+            response.headers
+            .get("Content-Type", "")
+            .lower()
+        )
+
+        return limit_output(
+            "SCRAPED WEBPAGE:\n\n"
+            f"{text}\n\n"
+            "EXTRACTION REQUEST:\n"
+            f"{prompt}"
+)
+        # ======================================
+        # PDF
+        # ======================================
+
+        if (
+            "application/pdf" in content_type
+            or url.lower().split("?")[0].endswith(".pdf")
+        ):
+
+            text = extract_pdf_text(
+                response.content
+            )
+
+            return (
+                "SCRAPED PDF:\n\n"
+                f"{text}\n\n"
+                "EXTRACTION REQUEST:\n"
+                f"{prompt}"
+            )
+
+        # ======================================
+        # HTML
+        # ======================================
 
         soup = BeautifulSoup(
             response.text,
@@ -182,7 +293,7 @@ def smart_web_scraper(
 
         return (
             "SCRAPED WEBPAGE:\n\n"
-            f"{text[:12000]}\n\n"
+            f"{text[:MAX_WEB_TEXT]}\n\n"
             "EXTRACTION REQUEST:\n"
             f"{prompt}"
         )
@@ -209,7 +320,7 @@ def find_in_page(
 
     Args:
         pattern: Text to search for.
-        page_content: Webpage text.
+        page_content: Webpage content.
 
     Returns:
         Relevant lines containing the pattern.
@@ -243,7 +354,6 @@ def find_in_page(
                 )
 
         if not matches:
-
             return (
                 f"No occurrences found for: "
                 f"{pattern}"

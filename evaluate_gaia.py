@@ -119,6 +119,7 @@ model = OpenAIServerModel(
     api_base="https://api.groq.com/openai/v1",
     api_key=GROQ_API_KEY,
     tool_choice="auto",
+    max_tokens=500,
 )
 
 
@@ -182,9 +183,11 @@ print(
 agent = ToolCallingAgent(
     tools=ALL_TOOLS,
     model=model,
-    verbosity_level=0,
+    instructions=SYSTEM_PROMPT,
+    max_steps=6,
+    verbosity_level=1,
+    return_full_result=True,
 )
-
 
 # ============================================================
 # HELPER FUNCTIONS
@@ -340,23 +343,26 @@ def get_prediction(response):
     """
 
     if response is None:
+        return "Error: Empty response"
 
+    # RunResult
+    if hasattr(response, "output"):
+
+        response = response.output
+
+    if response is None:
         return "Error: Empty response"
 
     try:
-
         prediction = str(response).strip()
 
     except Exception:
-
         prediction = repr(response)
 
     if not prediction:
-
         return "Error: Empty response"
 
     return prediction
-
 
 # ============================================================
 # DATASET

@@ -59,15 +59,25 @@ print()
 
 print("10. Sending request to agent...", flush=True)
 
-response = agent.run(
-    """
-    Search the web for "AI regulation arXiv June 2022".
-    Find one relevant result and return its title and URL.
-    """
+result = agent.run(
+    prompt,
+    return_full_result=True,
 )
-print("11. Agent finished", flush=True)
 
-print("==============================")
-print("ANSWER")
-print("==============================")
-print(response)
+safe_print("")
+safe_print("========== DEBUG RESULT ==========")
+safe_print(f"RESULT TYPE: {type(result)}")
+safe_print(f"RESULT: {result}")
+safe_print("==================================")
+
+if hasattr(result, "output"):
+    prediction = result.output
+else:
+    prediction = result
+
+prediction = get_prediction(prediction)
+
+if prediction.startswith("Error:"):
+    failed += 1
+else:
+    successful += 1
