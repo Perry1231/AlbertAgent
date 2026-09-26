@@ -8,6 +8,7 @@ import logging
 import traceback
 from pathlib import Path
 
+
 # ============================================================
 # FORCE UTF-8
 # ============================================================
@@ -77,8 +78,6 @@ BASE_DIR = Path(__file__).resolve().parent
 
 OUTPUT_FILE = BASE_DIR / "submission.jsonl"
 
-# Якщо файли GAIA вже завантажені локально,
-# можна покласти їх у цю папку.
 GAIA_FILES_DIR = BASE_DIR / "gaia_files"
 
 
@@ -168,6 +167,15 @@ General rules:
 
 12. Never output a fabricated answer merely because
     a tool failed.
+
+13. If you have enough information to answer the task,
+    stop researching and provide the final answer.
+
+14. Do not repeatedly search for the same information
+    unless the previous result was insufficient.
+
+15. For multi-hop research tasks, keep track of the
+    exact evidence needed for the final answer.
 """
 
 
@@ -189,6 +197,7 @@ agent = ToolCallingAgent(
     return_full_result=True,
 )
 
+
 # ============================================================
 # HELPER FUNCTIONS
 # ============================================================
@@ -197,9 +206,16 @@ def safe_print(text=""):
     """
     UTF-8-safe console output.
     """
+
     try:
-        print(text, flush=True)
+
+        print(
+            text,
+            flush=True
+        )
+
     except UnicodeEncodeError:
+
         print(
             str(text).encode(
                 "utf-8",
@@ -211,6 +227,10 @@ def safe_print(text=""):
             flush=True
         )
 
+
+# ============================================================
+# FIND ATTACHMENT
+# ============================================================
 
 def find_attachment(file_name):
     """
@@ -251,6 +271,10 @@ def find_attachment(file_name):
 
     return None
 
+
+# ============================================================
+# BUILD PROMPT
+# ============================================================
 
 def build_prompt(question, file_name=""):
     """
@@ -311,6 +335,10 @@ def build_prompt(question, file_name=""):
     return "\n".join(prompt_parts)
 
 
+# ============================================================
+# SAVE RESULT
+# ============================================================
+
 def save_result(output_file, task_id, prediction):
     """
     Append one result to submission.jsonl.
@@ -337,12 +365,17 @@ def save_result(output_file, task_id, prediction):
         )
 
 
+# ============================================================
+# GET PREDICTION
+# ============================================================
+
 def get_prediction(response):
     """
     Convert agent response into a clean string.
     """
 
     if response is None:
+
         return "Error: Empty response"
 
     # RunResult
@@ -351,18 +384,170 @@ def get_prediction(response):
         response = response.output
 
     if response is None:
+
         return "Error: Empty response"
 
     try:
-        prediction = str(response).strip()
+
+        prediction = str(
+            response
+        ).strip()
 
     except Exception:
-        prediction = repr(response)
+
+        prediction = repr(
+            response
+        )
 
     if not prediction:
+
         return "Error: Empty response"
 
     return prediction
+
+
+# ============================================================
+# DEBUG RUN RESULT
+# ============================================================
+
+def print_run_result(result):
+    """
+    Print detailed RunResult diagnostics.
+    """
+
+    safe_print("")
+    safe_print(
+        "============================================================"
+    )
+    safe_print(
+        "AGENT RESULT"
+    )
+    safe_print(
+        "============================================================"
+    )
+
+    safe_print(
+        f"RESULT TYPE: {type(result).__name__}"
+    )
+
+    # --------------------------------------------------------
+    # STATE
+    # --------------------------------------------------------
+
+    if hasattr(result, "state"):
+
+        safe_print(
+            f"STATE: {result.state}"
+        )
+
+    # --------------------------------------------------------
+    # OUTPUT
+    # --------------------------------------------------------
+
+    if hasattr(result, "output"):
+
+        safe_print(
+            f"OUTPUT: {repr(result.output)}"
+        )
+
+    # --------------------------------------------------------
+    # TOKEN USAGE
+    # --------------------------------------------------------
+
+    if hasattr(result, "token_usage"):
+
+        safe_print(
+            f"TOKEN USAGE: {result.token_usage}"
+        )
+
+        token_usage = result.token_usage
+
+        if token_usage is not None:
+
+            if hasattr(
+                token_usage,
+                "input_tokens"
+            ):
+
+                safe_print(
+                    f"INPUT TOKENS: "
+                    f"{token_usage.input_tokens}"
+                )
+
+            if hasattr(
+                token_usage,
+                "output_tokens"
+            ):
+
+                safe_print(
+                    f"OUTPUT TOKENS: "
+                    f"{token_usage.output_tokens}"
+                )
+
+    # --------------------------------------------------------
+    # TIMING
+    # --------------------------------------------------------
+
+    if hasattr(result, "timing"):
+
+        safe_print(
+            f"TIMING: {result.timing}"
+        )
+
+    # --------------------------------------------------------
+    # STEPS
+    # --------------------------------------------------------
+
+    if hasattr(result, "steps"):
+
+        safe_print(
+            f"TOTAL STEPS: {len(result.steps)}"
+        )
+
+        for step_index, step in enumerate(
+            result.steps
+        ):
+
+            safe_print("")
+            safe_print(
+                f"--- STEP {step_index} ---"
+            )
+
+            if isinstance(
+                step,
+                dict
+            ):
+
+                safe_print(
+                    f"TYPE: "
+                    f"{step.get('type', 'unknown')}"
+                )
+
+                if step.get("error") is not None:
+
+                    safe_print(
+                        f"ERROR: "
+                        f"{step.get('error')}"
+                    )
+
+                if step.get("token_usage") is not None:
+
+                    safe_print(
+                        f"TOKEN USAGE: "
+                        f"{step.get('token_usage')}"
+                    )
+
+            else:
+
+                safe_print(
+                    f"TYPE: "
+                    f"{type(step).__name__}"
+                )
+
+    safe_print(
+        "============================================================"
+    )
+
 
 # ============================================================
 # DATASET
@@ -389,9 +574,11 @@ def load_gaia_dataset():
         safe_print(
             "============================================================"
         )
+
         safe_print(
             "ERROR LOADING GAIA DATASET"
         )
+
         safe_print(
             "============================================================"
         )
@@ -446,20 +633,6 @@ def main():
     # LIMIT
     # --------------------------------------------------------
 
-    # Example:
-    #
-    # GAIA_LIMIT=1
-    #
-    # -> test only first task
-    #
-    # GAIA_LIMIT=10
-    #
-    # -> test first 10 tasks
-    #
-    # GAIA_LIMIT=all
-    #
-    # -> run everything
-
     limit_env = os.getenv(
         "GAIA_LIMIT",
         "1"
@@ -473,7 +646,9 @@ def main():
 
         try:
 
-            limit = int(limit_env)
+            limit = int(
+                limit_env
+            )
 
         except ValueError:
 
@@ -498,7 +673,8 @@ def main():
         )
 
     safe_print(
-        f"STEP 3: Tasks selected: {len(test_dataset)}"
+        f"STEP 3: Tasks selected: "
+        f"{len(test_dataset)}"
     )
 
     # --------------------------------------------------------
@@ -506,10 +682,10 @@ def main():
     # --------------------------------------------------------
 
     safe_print(
-        f"STEP 4: Output file: {OUTPUT_FILE}"
+        f"STEP 4: Output file: "
+        f"{OUTPUT_FILE}"
     )
 
-    # Start with empty output file.
     with open(
         OUTPUT_FILE,
         "w",
@@ -556,13 +732,18 @@ def main():
             ""
         )
 
+        # ----------------------------------------------------
+        # TASK HEADER
+        # ----------------------------------------------------
+
         safe_print("")
         safe_print(
             "============================================================"
         )
 
         safe_print(
-            f"TASK {task_number}/{len(test_dataset)}"
+            f"TASK {task_number}/"
+            f"{len(test_dataset)}"
         )
 
         safe_print(
@@ -586,6 +767,7 @@ def main():
         safe_print(
             "PROMPT:"
         )
+
         safe_print(
             prompt
         )
@@ -603,15 +785,40 @@ def main():
 
         try:
 
-            response = agent.run(
-                prompt
+            result = agent.run(
+                prompt,
+                return_full_result=True
             )
+
+            # ------------------------------------------------
+            # PRINT COMPLETE RESULT
+            # ------------------------------------------------
+
+            print_run_result(
+                result
+            )
+
+            # ------------------------------------------------
+            # EXTRACT ANSWER
+            # ------------------------------------------------
 
             prediction = get_prediction(
-                response
+                result
             )
 
-            successful += 1
+            # ------------------------------------------------
+            # SUCCESS / FAILURE
+            # ------------------------------------------------
+
+            if prediction.startswith(
+                "Error:"
+            ):
+
+                failed += 1
+
+            else:
+
+                successful += 1
 
         except KeyboardInterrupt:
 
@@ -644,12 +851,17 @@ def main():
             )
 
             safe_print(
-                f"ERROR TYPE: {type(e).__name__}"
+                f"ERROR TYPE: "
+                f"{type(e).__name__}"
             )
 
             safe_print(
                 f"ERROR: {repr(e)}"
             )
+
+            # ------------------------------------------------
+            # CAUSE
+            # ------------------------------------------------
 
             if e.__cause__ is not None:
 
@@ -659,8 +871,13 @@ def main():
                 )
 
                 safe_print(
-                    f"CAUSE: {repr(e.__cause__)}"
+                    f"CAUSE: "
+                    f"{repr(e.__cause__)}"
                 )
+
+            # ------------------------------------------------
+            # CONTEXT
+            # ------------------------------------------------
 
             if e.__context__ is not None:
 
@@ -670,13 +887,20 @@ def main():
                 )
 
                 safe_print(
-                    f"CONTEXT: {repr(e.__context__)}"
+                    f"CONTEXT: "
+                    f"{repr(e.__context__)}"
                 )
+
+            # ------------------------------------------------
+            # TRACEBACK
+            # ------------------------------------------------
 
             traceback.print_exc()
 
             prediction = (
-                f"Error: {type(e).__name__}: {e}"
+                f"Error: "
+                f"{type(e).__name__}: "
+                f"{e}"
             )
 
         # ----------------------------------------------------
@@ -731,27 +955,33 @@ def main():
     safe_print(
         "============================================================"
     )
+
     safe_print(
         "EVALUATION FINISHED"
     )
+
     safe_print(
         "============================================================"
     )
 
     safe_print(
-        f"Total tasks: {len(test_dataset)}"
+        f"Total tasks: "
+        f"{len(test_dataset)}"
     )
 
     safe_print(
-        f"Successful: {successful}"
+        f"Successful: "
+        f"{successful}"
     )
 
     safe_print(
-        f"Failed: {failed}"
+        f"Failed: "
+        f"{failed}"
     )
 
     safe_print(
-        f"Results: {OUTPUT_FILE}"
+        f"Results: "
+        f"{OUTPUT_FILE}"
     )
 
     safe_print(
