@@ -176,6 +176,12 @@ General rules:
 
 15. For multi-hop research tasks, keep track of the
     exact evidence needed for the final answer.
+    16. When you are ready to give the final answer, you MUST call the tool named "final_answer".
+17. The tool name is exactly "final_answer", not "answer".
+18. Pass the final response in the "answer" argument.
+19. Never call a tool named "answer".
+20. Do not put the final answer only in reasoning.
+21. Do not finish with an empty assistant message
 """
 
 
