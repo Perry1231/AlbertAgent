@@ -1,1 +1,1 @@
-{"task_id": "c61d22de-5f6c-4958-a7f6-5e9707bd3466", "model_answer": "Error: Empty response"}
+{"task_id": "c61d22de-5f6c-4958-a7f6-5e9707bd3466", "model_answer": "[{'type': 'text', 'text': 'Error in generating final LLM output: Error code: 400 - {\\'error\\': {\\'message\\': \\'Tool choice is none, but model called a tool\\', \\'type\\': \\'invalid_request_error\\', \\'code\\': \\'tool_use_failed\\', \\'failed_generation\\': \\'{\"name\": \"visit_webpage\", \"arguments\": {\"url\":\"https://ar5iv.labs.arxiv.org/html/2207.01510\"}}\\'}}'}]"}

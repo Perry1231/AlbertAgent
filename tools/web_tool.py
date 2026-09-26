@@ -371,3 +371,32 @@ def find_in_page(
             f"Find error: "
             f"{type(e).__name__}: {e}"
         )
+
+
+@tool
+def clean_url(url: str) -> str:
+    """
+    Clean URLs accidentally returned as Markdown links.
+
+    Args:
+        url: URL that may be wrapped in Markdown link syntax.
+    """
+
+    if not url:
+        return url
+
+    url = str(url).strip()
+
+    # Markdown:
+    # [https://example.com](https://example.com)
+    if url.startswith("[") and "](" in url and url.endswith(")"):
+        try:
+            url = url.split("](", 1)[1][:-1]
+        except Exception:
+            pass
+
+    # Remove surrounding <>
+    if url.startswith("<") and url.endswith(">"):
+        url = url[1:-1]
+
+    return url.strip()

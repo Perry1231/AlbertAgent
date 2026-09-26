@@ -34,13 +34,8 @@ if not groq_api_key:
 model = OpenAIServerModel(
     model_id="openai/gpt-oss-120b",
     api_base="https://api.groq.com/openai/v1",
-    api_key=groq_api_key,
-
-    # Низька температура для стабільнішого виконання коду
-    temperature=0.2,
-
-    # Не дозволяємо моделі генерувати величезні відповіді
-    max_tokens=1024,
+    api_key=GROQ_API_KEY,
+    max_tokens=500,
 )
 
 
