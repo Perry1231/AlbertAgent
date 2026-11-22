@@ -1,0 +1,19 @@
+1) tools.py — The agent's tools (web search, web scraper, Python code execution, file reading).
+
+2) custom_agent.py — Your custom, token-optimized agent core built on the OpenAI SDK (controls context size, truncates tool outputs, handles Groq rate limits).
+
+3) gaia_agent.py — An older agent wrapper (likely based on smolagents), unused if app.py and evaluate_gaia.py do not import it.
+
+4) evaluate_gaia.py — The benchmark runner that loads GAIA questions, queries the agent, and saves answers.
+
+5) submission.jsonl — The output log storing task_id and model_answer pairs generated during evaluation.
+
+6) check_score.py — The local grading script that compares submission.jsonl against GAIA ground truth and calculates accuracy.
+
+7) app.py — The main web UI / API entry point for Hugging Face Spaces (Gradio/FastAPI).
+
+8) course_evaluation.py & course_test_result.json — The final evaluation script and results file for submitting the Hugging Face Agents Course assignment.
+
+9) .env & .venv — Secret API keys (GROQ_API_KEY, HF_TOKEN) and your local Python virtual environment.
+
+10) requirements.txt, .gitignore, README.md, LICENSE — Project dependencies, Git exclusions, documentation, and license.
