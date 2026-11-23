@@ -7,6 +7,7 @@ __pycache__/
 *.so
 .python-version
 
+
 # Віртуальні оточення
 .venv/
 venv/
@@ -26,6 +27,7 @@ venv.bak/
 
 # Локально завантажені вагові коефіцієнти моделей, датасети та кеш
 /models/
+gaia_files/
 /checkpoints/
 /datasets/
 .cache/
