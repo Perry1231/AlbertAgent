@@ -554,7 +554,20 @@ def run_agent(prompt: str) -> str:
                     "content": result,
                 }
             )
+    messages.append({
+        "role": "user",
+        "content": (
+            "Execution step limit reached. Do NOT call any tools. "
+            "Based on all the facts gathered above, give your single best final answer now. "
+            "Output ONLY the exact answer (a number, word, or short phrase), no explanations."
+        ),
+    })
+    final_resp = create_completion(messages, use_tools=False, max_tokens=MAX_FINAL_TOKENS)
+    final_ans = clean_final_answer(final_resp.choices[0].message.content or "")
+    if final_ans:
+        return final_ans
 
+    return "Unable to produce a final answer within the available execution limits."
     print()
     print("=" * 60)
     print("MAX STEPS REACHED")
