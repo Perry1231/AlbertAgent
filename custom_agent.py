@@ -40,15 +40,15 @@ MODEL = "openai/gpt-oss-120b"
 # CONFIG
 # ============================================================
 
-MAX_STEPS = 5
-MAX_TOOL_RESULT_CHARS = 2500
-MAX_HISTORY_BLOCKS = 3
+MAX_STEPS = 7
+MAX_TOOL_RESULT_CHARS = 3200
+MAX_HISTORY_BLOCKS = 2
 
-MAX_OUTPUT_TOKENS = 1200
-MAX_FINAL_TOKENS = 1000
+MAX_OUTPUT_TOKENS = 1400
+MAX_FINAL_TOKENS = 1500
 
 MAX_RETRIES = 3
-SEARCH_MAX_CALLS = 3
+SEARCH_MAX_CALLS = 4
 SAFE_CONTEXT_CHARS = 14000
 
 
@@ -70,6 +70,14 @@ Follow these rules strictly:
 9. Once you have enough evidence to answer accurately, stop calling tools immediately and return the final answer.
 10. Output ONLY the exact final answer without explanations, filler, markdown formatting, or full sentences unless explicitly asked.
 11. If the answer is a symbol or character name (like backtick, comma, asterisk), write its plain English word name without the symbol in brackets unless asked for the symbol itself.
+12. ATTACHED FILES FIRST: If a local file path is mentioned in the prompt (e.g., .xlsx, .csv, .json, .jsonld, .pdb, .pdf, .txt, .py, .docx), NEVER search the web for it first. Immediately use `execute_python_code` to inspect its structure, sheet names, keys, or contents and compute the exact answer.
+13. WEB SEARCH STRATEGY: Use short, targeted 2-5 word keyword queries (entity names, exact titles, dates). Never paste the full question into search. After getting search results, use the scraper/page tool on the most authoritative URL (especially Wikipedia, official databases, or primary sources) to read the exact numbers/facts.
+14. USE PYTHON FOR ALL MATH & DATA: Never do arithmetic, unit conversions, date differences, or counting in your head. Always verify calculations with `execute_python_code`.
+15. EXACT ANSWER FORMAT (STRICT):
+   - Output ONLY the final answer with zero explanation, no full sentences, and no markdown formatting.
+   - Do NOT include units (like %, m³, km, USD) unless the question explicitly asks for units.
+   - Do NOT round numbers unless the question explicitly specifies rounding (e.g. "round to two decimal places"). Preserve full decimal precision.
+   - For comma/semicolon-separated lists, put a single space after each comma or semicolon (e.g., `a, b, c` or `1.2; 3.4`).
 """
 
 

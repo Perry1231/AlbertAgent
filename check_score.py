@@ -1,6 +1,5 @@
 import json
 import os
-import re
 from pathlib import Path
 from dotenv import load_dotenv
 from datasets import load_dataset
@@ -10,11 +9,14 @@ load_dotenv(BASE_DIR / ".env")
 load_dotenv(BASE_DIR.parent / ".env")
 
 
-def normalize(text):
-    s = str(text or "").strip().lower()
-    s = re.sub(r"\s+", " ", s)
-    return s.strip(".,!?;:\"'`")
+import re
 
+def normalize(text: str) -> str:
+    s = str(text).strip().lower()
+    s = s.strip('"\'')
+    s = re.sub(r"\s*([,;])\s*", r"\1 ", s)
+    s = re.sub(r"\s+", " ", s)
+    return s.strip()
 
 def main():
     sub_path = BASE_DIR / "submission.jsonl"
