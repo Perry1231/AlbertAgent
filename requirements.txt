@@ -1,8 +1,15 @@
 gradio
+smolagents
 openai
 python-dotenv
 requests
 pandas
 openpyxl
 beautifulsoup4
+lxml
 ddgs
+duckduckgo-search
+pypdf
+python-docx
+sympy
+numpy
