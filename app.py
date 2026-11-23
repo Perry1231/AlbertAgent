@@ -4,6 +4,11 @@ import gradio as gr
 import requests
 import pandas as pd
 from custom_agent import run_agent
+import spaces
+
+@spaces.GPU
+def dummy_gpu():
+    pass
 
 DEFAULT_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
