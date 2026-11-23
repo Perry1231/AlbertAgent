@@ -562,14 +562,14 @@ def run_agent(prompt: str) -> str:
             "Output ONLY the exact answer (a number, word, or short phrase), no explanations."
         ),
     })
-    final_resp = create_completion(messages, use_tools=False, max_tokens=MAX_FINAL_TOKENS)
+    final_resp = client.chat.completions.create(
+        model=MODEL,
+        messages=messages,
+        max_tokens=MAX_FINAL_TOKENS,
+        temperature=0.0,
+    )
     final_ans = clean_final_answer(final_resp.choices[0].message.content or "")
     if final_ans:
         return final_ans
 
     return "Unable to produce a final answer within the available execution limits."
-    print()
-    print("=" * 60)
-    print("MAX STEPS REACHED")
-    print("=" * 60)
-    return force_final_answer(messages)
