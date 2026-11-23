@@ -215,12 +215,14 @@ def compact_text(text: Any, max_chars: int) -> str:
 
 
 def clean_final_answer(text: Any) -> str:
-    m = re.match(r"^`?\s*[^\w\s]\s*`?\s*\(([a-zA-Z0-9 _-]+)\)$", s)
-    if m:
-        s = m.group(1).strip()
     s = str(text or "").strip()
     s = re.sub(r"<think>.*?</think>", "", s, flags=re.DOTALL).strip()
     s = re.sub(r"^(final\s*answer|answer)\s*:\s*", "", s, flags=re.IGNORECASE).strip()
+
+    m = re.match(r"^`?\s*[^\w\s]\s*`?\s*\(([a-zA-Z0-9 _-]+)\)$", s)
+    if m:
+        s = m.group(1).strip()
+
     if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
         s = s[1:-1].strip()
     return s
