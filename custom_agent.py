@@ -22,18 +22,18 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 load_dotenv(BASE_DIR.parent / ".env")
 
-api_key = os.getenv("OPENROUTER_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
-    raise RuntimeError("OPENROUTER_API_KEY not found")
+    raise RuntimeError("GROQ_API_KEY not found")
 
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
+    base_url="https://api.groq.com/openai/v1",
     api_key=api_key,
     timeout=60.0,
     max_retries=1,
 )
 
-MODEL = "nvidia/nemotron-3.5-super-vl:free"
+MODEL = "openai/gpt-oss-120b"
 
 
 # ============================================================
@@ -44,8 +44,8 @@ MAX_STEPS = 5
 MAX_TOOL_RESULT_CHARS = 2500
 MAX_HISTORY_BLOCKS = 3
 
-MAX_OUTPUT_TOKENS = 1000
-MAX_FINAL_TOKENS = 1500
+MAX_OUTPUT_TOKENS = 1200
+MAX_FINAL_TOKENS = 1000
 
 MAX_RETRIES = 3
 SEARCH_MAX_CALLS = 3
