@@ -13,7 +13,9 @@ from openai import OpenAI
 
 import tools
 
-
+tools.transcribe_audio,
+tools.analyze_image,
+tools.get_youtube_transcript,
 # ============================================================
 # ENV & CLIENT SETUP
 # ============================================================
