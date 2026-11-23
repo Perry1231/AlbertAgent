@@ -554,7 +554,7 @@ def run_agent(prompt: str) -> str:
                     "content": result,
                 }
             )
-    messages.append({
+        messages.append({
         "role": "user",
         "content": (
             "Execution step limit reached. Do NOT call any tools. "
@@ -562,14 +562,23 @@ def run_agent(prompt: str) -> str:
             "Output ONLY the exact answer (a number, word, or short phrase), no explanations."
         ),
     })
-    final_resp = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        max_tokens=MAX_FINAL_TOKENS,
-        temperature=0.0,
-    )
-    final_ans = clean_final_answer(final_resp.choices[0].message.content or "")
-    if final_ans:
-        return final_ans
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            final_resp = client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                max_tokens=1500,
+                temperature=0.0,
+            )
+            final_ans = clean_final_answer(final_resp.choices[0].message.content or "")
+            if final_ans:
+                return final_ans
+            break
+        except Exception as e:
+            if "429" in str(e) and attempt < MAX_RETRIES:
+                time.sleep(3)
+                continue
+            raise
 
     return "Unable to produce a final answer within the available execution limits."
