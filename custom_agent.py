@@ -40,12 +40,12 @@ MODEL = "openai/gpt-oss-120b"
 # CONFIG
 # ============================================================
 
-MAX_STEPS = 7
-MAX_TOOL_RESULT_CHARS = 3200
+MAX_STEPS = 5
+MAX_TOOL_RESULT_CHARS = 1800
 MAX_HISTORY_BLOCKS = 2
 
-MAX_OUTPUT_TOKENS = 1400
-MAX_FINAL_TOKENS = 1500
+MAX_OUTPUT_TOKENS = 1000
+MAX_FINAL_TOKENS = 1000
 
 MAX_RETRIES = 3
 SEARCH_MAX_CALLS = 4
@@ -78,6 +78,7 @@ Follow these rules strictly:
    - Do NOT include units (like %, m³, km, USD) unless the question explicitly asks for units.
    - Do NOT round numbers unless the question explicitly specifies rounding (e.g. "round to two decimal places"). Preserve full decimal precision.
    - For comma/semicolon-separated lists, put a single space after each comma or semicolon (e.g., `a, b, c` or `1.2; 3.4`).
+16. If an audio file (.mp3/.wav) is attached, call `transcribe_audio` first. If an image (.png/.jpg) is attached, call `analyze_image` first. If a YouTube URL is in the question, call `get_youtube_transcript` first.
 """
 
 

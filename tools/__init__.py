@@ -38,6 +38,11 @@ from tools.api_tools import (
     get_weather_forecast,
 )
 
+from tools.media_tools import (
+    transcribe_audio,
+    analyze_image,
+    get_youtube_transcript,
+)
 
 ALL_TOOLS = [
     calculate_discount,
@@ -65,4 +70,8 @@ ALL_TOOLS = [
 
     execute_bash_command,
     install_pip_package,
+
+    transcribe_audio,
+    analyze_image,
+    get_youtube_transcript    
 ]
