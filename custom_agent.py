@@ -35,7 +35,7 @@ client = OpenAI(
     timeout=45.0,
 )
 
-MODEL = "openai/gpt-oss-120b"
+MODEL = "llama-3.3-70b-versatile"
 
 
 # ============================================================
@@ -333,8 +333,8 @@ def create_completion(
                 print("=" * 60)
                 print(e)
                 if attempt < MAX_RETRIES:
-                    print("Waiting 12s for Groq TPM limit reset...")
-                    time.sleep(12)
+                    print("Waiting 22s for Groq TPM limit reset...")
+                    time.sleep(22)
                     # Стискаємо історію ще сильніше перед повтором
                     if len(working_messages) > 2:
                         working_messages = working_messages[:2] + working_messages[-2:]
