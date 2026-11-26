@@ -36,7 +36,12 @@ client = OpenAI(
 )
 
 MODEL = "llama-3.3-70b-versatile"
-
+GROQ_MODELS = [
+    "llama-3.3-70b-versatile",
+    "qwen/qwen3-32b",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "openai/gpt-oss-120b",
+]
 
 # ============================================================
 # CONFIG
