@@ -35,7 +35,6 @@ client = OpenAI(
     timeout=45.0,
 )
 
-MODEL = "llama-3.3-70b-versatile"
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "qwen/qwen3-32b",
