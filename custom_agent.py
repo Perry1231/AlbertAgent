@@ -33,10 +33,9 @@ client = OpenAI(
 )
 
 GROQ_MODELS = [
-    "llama-3.3-70b-versatile",
+    "openai/gpt-oss-120b",
     "qwen/qwen3-32b",
     "meta-llama/llama-4-scout-17b-16e-instruct",
-    "openai/gpt-oss-120b",
 ]
 
 # ============================================================
@@ -317,22 +316,26 @@ def create_completion(
             error_text = str(e).lower()
 
             # 1. Будь-який Rate Limit (429 / TPD / TPM) — миттєво перемикаємося на наступну модель
-            if (
-                "429" in error_text
-                or "rate limit" in error_text
-                or "tokens per day" in error_text
-                or "tokens per minute" in error_text
-                or "tpd" in error_text
-                or "tpm" in error_text
-            ):
-                print(f"Rate limit on {model_name} (attempt {attempt}/{MAX_RETRIES}). Switching model...")
-                if attempt < MAX_RETRIES:
-                    time.sleep(2)
-                    continue
-                raise
+            # 1. Будь-який Rate Limit (429 / TPD / TPM) або недоступна модель (404) — перемикаємося на наступну
+        if (
+             "429" in error_text
+             or "rate limit" in error_text
+             or "tokens per day" in error_text
+             or "tokens per minute" in error_text
+             or "tpd" in error_text
+             or "tpm" in error_text
+             or "404" in error_text
+             or "does not exist" in error_text
+             or "model_not_found" in error_text
+         ):
+             print(f"Switching model from {model_name} (attempt {attempt}/{MAX_RETRIES}): {e}")
+             if attempt < MAX_RETRIES:
+                 time.sleep(8 if "429" in error_text or "tpm" in error_text else 0.5)
+                 continue
+             raise
 
             # 2. Завеликий запит — стискаємо контекст
-            if "request too large" in error_text or "413" in error_text:
+        if "request too large" in error_text or "413" in error_text:
                 print(f"Request too large on {model_name}. Compacting context...")
                 if len(working_messages) > 2:
                     working_messages = working_messages[:2] + working_messages[-2:]
@@ -341,7 +344,7 @@ def create_completion(
                 raise
 
             # 3. Помилка парсингу tool call від моделі (400 parsing failed)
-            if (
+        if (
                 "parsing failed" in error_text
                 or "output_parse_failed" in error_text
                 or "tool_use_failed" in error_text
@@ -358,7 +361,7 @@ def create_completion(
                     continue
                 raise
 
-            raise
+        raise
 
     if last_error:
         raise last_error
