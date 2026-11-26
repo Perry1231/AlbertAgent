@@ -13,9 +13,6 @@ from openai import OpenAI
 
 import tools
 
-tools.transcribe_audio,
-tools.analyze_image,
-tools.get_youtube_transcript,
 # ============================================================
 # ENV & CLIENT SETUP
 # ============================================================
@@ -29,7 +26,7 @@ if not api_key:
     raise RuntimeError("GROQ_API_KEY not found")
 
 client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
+    api_key=api_key,
     base_url="https://api.groq.com/openai/v1",
     max_retries=0,
     timeout=45.0,
@@ -53,8 +50,8 @@ MAX_HISTORY_BLOCKS = 2
 MAX_OUTPUT_TOKENS = 1000
 MAX_FINAL_TOKENS = 1000
 
-MAX_RETRIES = 3
-SEARCH_MAX_CALLS = 4
+MAX_RETRIES = 4
+SEARCH_MAX_CALLS = 3
 SAFE_CONTEXT_CHARS = 14000
 
 
@@ -68,28 +65,27 @@ Follow these rules strictly:
 1. Read the user question carefully and identify the exact entity, number, word, or fact requested.
 2. Use tools only when external information, web pages, files, or calculations are needed.
 3. Never repeat the exact same tool call with the same arguments.
-4. Keep search queries short, specific, and keyword-focused.
+4. Keep search queries short, specific, and keyword-focused (2-5 words). Never paste the full question into search.
 5. Search at most 3 times per task. After searching, if a relevant URL is found, open and read it with smart_web_scraper instead of searching again.
-6. NEVER invent or guess URLs (never use placeholders like XXXX or IDs you did not see in search results). Only scrape exact URLs returned by search.
-7. If a local file path is provided in the prompt, inspect or read that local file using the available file/code tools before answering.
-8. When performing math, counting, or data parsing, use a code/calculator tool if available rather than guessing.
-9. Once you have enough evidence to answer accurately, stop calling tools immediately and return the final answer.
-10. Output ONLY the exact final answer without explanations, filler, markdown formatting, or full sentences unless explicitly asked.
-11. If the answer is a symbol or character name (like backtick, comma, asterisk), write its plain English word name without the symbol in brackets unless asked for the symbol itself.
-12. ATTACHED FILES FIRST: If a local file path is mentioned in the prompt (e.g., .xlsx, .csv, .json, .jsonld, .pdb, .pdf, .txt, .py, .docx), NEVER search the web for it first. Immediately use `execute_python_code` to inspect its structure, sheet names, keys, or contents and compute the exact answer.
-13. WEB SEARCH STRATEGY: Use short, targeted 2-5 word keyword queries (entity names, exact titles, dates). Never paste the full question into search. After getting search results, use the scraper/page tool on the most authoritative URL (especially Wikipedia, official databases, or primary sources) to read the exact numbers/facts.
-14. USE PYTHON FOR ALL MATH & DATA: Never do arithmetic, unit conversions, date differences, or counting in your head. Always verify calculations with `execute_python_code`.
-15. EXACT ANSWER FORMAT (STRICT):
-   - Output ONLY the final answer with zero explanation, no full sentences, and no markdown formatting.
-   - Do NOT include units (like %, m³, km, USD) unless the question explicitly asks for units.
-   - Do NOT round numbers unless the question explicitly specifies rounding (e.g. "round to two decimal places"). Preserve full decimal precision.
-   - For comma/semicolon-separated lists, put a single space after each comma or semicolon (e.g., `a, b, c` or `1.2; 3.4`).
-16. If an audio file (.mp3/.wav) is attached, call `transcribe_audio` first. If an image (.png/.jpg) is attached, call `analyze_image` first. If a YouTube URL is in the question, call `get_youtube_transcript` first.
+6. NEVER invent or guess URLs. Only scrape exact URLs returned by search.
+7. ATTACHED FILES FIRST: If a local file path is mentioned in the prompt:
+   - Audio (.mp3, .wav, .m4a, .ogg): call `transcribe_audio` first.
+   - Image (.png, .jpg, .jpeg, .webp): call `analyze_image` first.
+   - Data/Code (.xlsx, .csv, .json, .pdf, .txt, .py, .docx): call `execute_python_code` first to inspect and compute the answer.
+8. If a YouTube URL is in the question, call `get_youtube_transcript` first.
+9. USE PYTHON FOR ALL MATH & DATA: Never do arithmetic, unit conversions, date differences, or counting in your head. Verify calculations with `execute_python_code`.
+10. Once you have enough evidence to answer accurately, stop calling tools immediately and return the final answer.
+11. EXACT ANSWER FORMAT (STRICT):
+   - Output ONLY the exact final answer with zero explanation, no full sentences, and no markdown formatting.
+   - Do NOT include units (like %, m³, km, USD) unless explicitly requested.
+   - Do NOT round numbers unless explicitly requested.
+   - For comma/semicolon-separated lists, put a single space after each comma or semicolon (e.g., `a, b, c`).
+   - If the answer is a symbol or character name, write its plain English word name unless asked for the symbol itself.
 """
 
 
 # ============================================================
-# DYNAMIC TOOL REGISTRY (FROM tools.py)
+# DYNAMIC TOOL REGISTRY (FROM tools)
 # ============================================================
 
 TYPE_MAP = {
@@ -167,7 +163,7 @@ def discover_tools() -> tuple[Dict[str, Callable[..., Any]], List[Dict[str, Any]
             )
             continue
 
-        # Підтримка звичайних Python-функцій із tools.py
+        # Підтримка звичайних Python-функцій із tools
         if inspect.isfunction(obj) and obj.__module__ == tools.__name__:
             sig = inspect.signature(obj)
             doc = inspect.getdoc(obj) or f"Execute {name}"
@@ -243,7 +239,6 @@ def clean_final_answer(text: Any) -> str:
     return s
 
 
-
 def estimate_chars(messages: List[Dict[str, Any]]) -> int:
     total = 0
     for msg in messages:
@@ -263,7 +258,6 @@ def compact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     head = messages[:2]
     tail = messages[2:]
 
-    # Групуємо хвіст по блоках (assistant + його tool відповіді)
     blocks: List[List[Dict[str, Any]]] = []
     current_block: List[Dict[str, Any]] = []
 
@@ -282,7 +276,6 @@ def compact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for blk in kept_blocks:
         compacted.extend(blk)
 
-    # Додатково стискаємо, якщо все ще перевищує SAFE_CONTEXT_CHARS
     while len(kept_blocks) > 1 and estimate_chars(compacted) > SAFE_CONTEXT_CHARS:
         kept_blocks.pop(0)
         compacted = list(head)
@@ -293,7 +286,7 @@ def compact_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 # ============================================================
-# GROQ COMPLETION WITH RATE LIMIT & PARSE HANDLING
+# GROQ COMPLETION WITH MODEL ROTATION & PARSE HANDLING
 # ============================================================
 
 def create_completion(
@@ -302,11 +295,13 @@ def create_completion(
     max_tokens: int = MAX_OUTPUT_TOKENS,
 ):
     working_messages = compact_messages(messages)
+    last_error: Exception | None = None
 
     for attempt in range(1, MAX_RETRIES + 1):
+        model_name = GROQ_MODELS[(attempt - 1) % len(GROQ_MODELS)]
         try:
             kwargs: Dict[str, Any] = {
-                "model": MODEL,
+                "model": model_name,
                 "messages": working_messages,
                 "temperature": 0.1,
                 "max_tokens": max_tokens,
@@ -318,61 +313,55 @@ def create_completion(
             return client.chat.completions.create(**kwargs)
 
         except Exception as e:
+            last_error = e
             error_text = str(e).lower()
 
-            # 1. Денний ліміт TPD — не чекаємо, одразу прокидаємо в evaluate_gaia.py для зупинки
-            if "tokens per day" in error_text or "tpd" in error_text or "daily token limit" in error_text:
-                raise
-
-            # 2. Хвилинний ліміт TPM або завеликий запит
+            # 1. Будь-який Rate Limit (429 / TPD / TPM) — миттєво перемикаємося на наступну модель
             if (
-                "tokens per minute" in error_text
+                "429" in error_text
+                or "rate limit" in error_text
+                or "tokens per day" in error_text
+                or "tokens per minute" in error_text
+                or "tpd" in error_text
                 or "tpm" in error_text
-                or "request too large" in error_text
-                or "413" in error_text
             ):
-                print()
-                print("=" * 60)
-                print(f"GROQ TPM / SIZE LIMIT (attempt {attempt}/{MAX_RETRIES})")
-                print("=" * 60)
-                print(e)
+                print(f"Rate limit on {model_name} (attempt {attempt}/{MAX_RETRIES}). Switching model...")
                 if attempt < MAX_RETRIES:
-                    print("Waiting 22s for Groq TPM limit reset...")
-                    time.sleep(22)
-                    # Стискаємо історію ще сильніше перед повтором
-                    if len(working_messages) > 2:
-                        working_messages = working_messages[:2] + working_messages[-2:]
+                    time.sleep(2)
                     continue
                 raise
 
-            # 3. Загальний Rate Limit 429
-            if "429" in error_text or "rate limit" in error_text:
-                wait_sec = 8 * attempt
-                print(f"Rate limit 429 (attempt {attempt}/{MAX_RETRIES}). Sleeping {wait_sec}s...")
+            # 2. Завеликий запит — стискаємо контекст
+            if "request too large" in error_text or "413" in error_text:
+                print(f"Request too large on {model_name}. Compacting context...")
+                if len(working_messages) > 2:
+                    working_messages = working_messages[:2] + working_messages[-2:]
                 if attempt < MAX_RETRIES:
-                    time.sleep(wait_sec)
                     continue
                 raise
 
-            # 4. Помилка парсингу tool call від моделі (400 parsing failed)
+            # 3. Помилка парсингу tool call від моделі (400 parsing failed)
             if (
                 "parsing failed" in error_text
                 or "output_parse_failed" in error_text
                 or "tool_use_failed" in error_text
                 or "tool call validation failed" in error_text
             ):
-                print(f"Tool call validation/parsing failed (attempt {attempt}/{MAX_RETRIES}). Retrying...")
+                print(f"Tool call validation/parsing failed on {model_name} (attempt {attempt}/{MAX_RETRIES}). Retrying...")
                 if attempt < MAX_RETRIES:
                     working_messages = list(working_messages) + [
                         {
                             "role": "user",
-                            "content": "Invalid tool name or format. Call ONLY an exact tool name from the provided tools list, or provide the final answer directly.",
+                            "content": "Invalid tool name or JSON arguments. Call ONLY an exact tool name with valid JSON, or provide the final answer directly.",
                         }
                     ]
                     continue
                 raise
 
             raise
+
+    if last_error:
+        raise last_error
 
 
 def force_final_answer(messages: List[Dict[str, Any]]) -> str:
@@ -393,7 +382,7 @@ def force_final_answer(messages: List[Dict[str, Any]]) -> str:
     ]
 
     print(f"CONTEXT SIZE: {estimate_chars(final_messages)} chars")
-    time.sleep(2)
+    time.sleep(1)
 
     try:
         response = create_completion(
@@ -441,10 +430,7 @@ def run_agent(prompt: str) -> str:
 
         compacted = compact_messages(messages)
         ctx_size = estimate_chars(compacted)
-        print()
-        print(f"CONTEXT SIZE: {ctx_size} chars")
-        print()
-        print(f"REQUEST SIZE: {ctx_size} chars")
+        print(f"\nCONTEXT SIZE: {ctx_size} chars")
 
         try:
             response = create_completion(
@@ -491,8 +477,7 @@ def run_agent(prompt: str) -> str:
             tool_name = tool_call.function.name
             raw_args = tool_call.function.arguments or "{}"
 
-            print()
-            print("RAW TOOL ARGUMENTS:")
+            print("\nRAW TOOL ARGUMENTS:")
             print(raw_args)
 
             try:
@@ -548,7 +533,6 @@ def run_agent(prompt: str) -> str:
 
             result = execute_tool(tool_name, args)
 
-            # Повертаємо спробу пошуку, якщо DuckDuckGo повернув порожньо або помилку
             if tool_name == "search" and (
                 "No results found" in str(result)
                 or "Search error:" in str(result)
@@ -569,31 +553,5 @@ def run_agent(prompt: str) -> str:
                     "content": result,
                 }
             )
-        messages.append({
-        "role": "user",
-        "content": (
-            "Execution step limit reached. Do NOT call any tools. "
-            "Based on all the facts gathered above, give your single best final answer now. "
-            "Output ONLY the exact answer (a number, word, or short phrase), no explanations."
-        ),
-    })
 
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            final_resp = client.chat.completions.create(
-                model=MODEL,
-                messages=messages,
-                max_tokens=1500,
-                temperature=0.0,
-            )
-            final_ans = clean_final_answer(final_resp.choices[0].message.content or "")
-            if final_ans:
-                return final_ans
-            break
-        except Exception as e:
-            if "429" in str(e) and attempt < MAX_RETRIES:
-                time.sleep(3)
-                continue
-            raise
-
-    return "Unable to produce a final answer within the available execution limits."
+    return force_final_answer(messages)
